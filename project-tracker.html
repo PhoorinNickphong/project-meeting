@@ -213,7 +213,7 @@
         ["A04", "สร้าง repo สาธารณะและเตรียมสัญญาอนุญาต", "A01", "เพิ่ม README, LICENSE, CONTRIBUTING, .gitignore และคำเตือนเรื่องไฟล์ประชุมตัวจริง", "มี repo เปิดอ่านได้และตรวจว่าไม่มีไฟล์ประชุมจริง ฐานข้อมูล หรือคีย์อยู่ใน Git"],
         ["A05", "ตั้ง GitHub Projects และ Milestone เฟส 1", "A04", "สร้างมุมมองงานในเฟส บอร์ดสถานะ และ Issues ย่อยพร้อมเกณฑ์ผ่าน", "หน้า README พาไปถึงบอร์ดและ Milestone ได้ และ Issue ระบุเงื่อนไขหลักของงาน"],
         ["A06", "ทดลอง Rust และหน้าจอภาษาไทย", "A01", "ลองแสดงอักษรไทย วรรณยุกต์ การพิมพ์ การแปะ และปุ่มลัดใน UI ที่เลือก", "มีผลทดสอบบน Windows และระบุไลบรารี UI พร้อมเหตุผลที่เลือก"],
-        ["A07", "ตั้งโครง Rust และตรวจอัตโนมัติบน Windows", "A04 A06", "ตรึงเครื่องมือและไลบรารี บันทึกคำสั่ง build แล้วตั้งให้ CI ตรวจ format, lint, test และ build", "เครื่องใหม่ build ตามคู่มือได้และมีผล CI ของ PR บน Windows"]
+        ["A07", "ตั้งโครง Rust และตรวจอัตโนมัติบน Windows", "A04", "ตรึงเครื่องมือและไลบรารี บันทึกคำสั่ง build แล้วตั้งให้ CI ตรวจ format, lint, test และ build", "เครื่องใหม่ build ตามคู่มือได้และมีผล CI ของ PR บน Windows"]
       ]],
       ["1.2 อัดเสียงและระบุผู้พูด · Alpha 1", [
         ["B01", "เลือกและทดสอบไมค์", "A07", "แสดงไมค์ที่ใช้ได้ ค่าเริ่มต้น ระดับสัญญาณ และข้อความเมื่อระบบปฏิเสธสิทธิ์", "เลือกไมค์ ทดสอบก่อนอัด และได้รับคำแนะนำเมื่อไมค์ใช้ไม่ได้"],
@@ -305,7 +305,12 @@
   const initial = {
     A01: { status: "done", note: "กำหนดขอบเขตและแผนรุ่นเบื้องต้นแล้ว" },
     A02: { status: "done", note: "มีหน้าจอตัวอย่างและตรวจไวยากรณ์สคริปต์แล้ว" },
-    A03: { status: "done", note: "มีไฟล์แผนงานฉบับนี้" }
+    A03: { status: "done", note: "มีไฟล์แผนงานฉบับนี้" },
+    A04: { status: "done", note: "เปิด repo สาธารณะ เชื่อม origin/main และเผยแพร่ซอร์สเริ่มต้นพร้อม MIT แล้ว", link: "https://github.com/PhoorinNickphong/project-meeting/issues/4" },
+    A05: { status: "done", note: "เปิด Milestone เฟส 1 และนำ Issues ทั้ง 32 รายการเข้า GitHub Projects แล้ว", link: "https://github.com/users/PhoorinNickphong/projects/1" },
+    A06: { status: "todo", note: "มีภาพตัวเลือกหน้าจอ 5 แบบแล้ว รอเลือกก่อนเริ่มพัฒนาหน้าจอ", link: "https://github.com/PhoorinNickphong/project-meeting/issues/6" },
+    A07: { status: "active", note: "ผ่าน format, lint, 2 tests และ build บน Windows ในเครื่องแล้ว GitHub Actions ยังติดปัญหาการเรียกเก็บเงินก่อนเริ่มทดสอบ", link: "https://github.com/PhoorinNickphong/project-meeting/issues/7" },
+    B04: { status: "active", note: "เริ่มแกนบันทึกเวลาเปลี่ยนผู้พูดแล้ว การเชื่อมไมค์และปุ่มลัดเป็นงานที่เหลือ", link: "https://github.com/PhoorinNickphong/project-meeting/issues/11" }
   };
   const fallback = { status: "todo", owner: "", link: "", note: "", updated: "" };
   let state = load();
