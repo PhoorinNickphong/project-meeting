@@ -1,0 +1,644 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>แผนงานแอปจดประชุม</title>
+<style>
+  :root {
+    color-scheme: light;
+    --page: #f3f4ee;
+    --paper: #fffefa;
+    --ink: #162c26;
+    --muted: #4d6158;
+    --line: #d5ded4;
+    --green: #14513e;
+    --mint: #d8edd6;
+    --warning: #843927;
+    font: 15px/1.55 "Leelawadee UI", Tahoma, system-ui, sans-serif;
+    color: var(--ink);
+    background: var(--page);
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; }
+  button, input, select, textarea { font: inherit; }
+  button, select, summary { cursor: pointer; }
+  button, select, input, textarea { color: inherit; }
+  button, select, input, textarea {
+    border: 1px solid #b9c9be;
+    border-radius: 8px;
+    padding: 8px 11px;
+    background: var(--paper);
+  }
+  button:hover { border-color: var(--green); }
+  button:focus-visible, summary:focus-visible, a:focus-visible,
+  select:focus-visible, input:focus-visible, textarea:focus-visible {
+    outline: 3px solid #278063;
+    outline-offset: 3px;
+  }
+  a { color: var(--green); text-underline-offset: 3px; }
+  h1, h2, h3, p { margin: 0; }
+  h1 { font-size: clamp(27px, 5vw, 47px); line-height: 1.23; }
+  h2 { font-size: clamp(21px, 3vw, 28px); line-height: 1.3; }
+  h3 { font-size: 17px; }
+  .wrap { width: min(1140px, 100% - 42px); margin-inline: auto; }
+  .masthead { border-bottom: 1px solid var(--line); background: var(--paper); }
+  .topbar, .actions, .tools, .phase-head, .task-head {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .topbar { justify-content: space-between; padding-block: 13px; }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; }
+  .brand-mark { width: 30px; height: 30px; background: var(--green); color: white; border-radius: 8px; display: grid; place-items: center; }
+  .brand-mark svg { width: 20px; height: 20px; }
+  .actions button, .tools button, .tools a { font-size: 13px; }
+  .hero {
+    margin-block: 22px; border-radius: 18px; padding: clamp(19px, 4vw, 37px);
+    background: #143d31; color: #fffdf1; display: grid;
+    grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); gap: 25px; align-items: center;
+  }
+  .hero .muted { color: #d3e5d9; }
+  .hero h1 { margin: 4px 0 9px; }
+  .hero-side { border-left: 1px solid #688377; padding-left: 23px; display: grid; gap: 10px; }
+  .hero-side span { display: block; }
+  .hero-side strong { display: block; color: #edfad9; overflow-wrap: anywhere; }
+  .small { font-size: 13px; }
+  .muted { color: var(--muted); }
+  .phase-nav { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-bottom: 24px; }
+  .phase-nav button { text-align: left; padding: 12px; display: grid; gap: 5px; }
+  .phase-nav button[aria-pressed="true"] { border-color: var(--green); background: var(--mint); box-shadow: inset 0 -3px var(--green); }
+  .phase-nav strong, .phase-nav span { display: block; }
+  .phase-nav progress { width: 100%; height: 7px; }
+  progress { accent-color: var(--green); }
+  .phase-head, .section-head, .task-head, .tools { justify-content: space-between; }
+  .phase-head { align-items: start; }
+  .phase-head p { margin-top: 5px; }
+  .pill { display: inline-flex; padding: 3px 8px; border-radius: 99px; background: #e8eee7; font-size: 13px; }
+  .pill[data-tone="blocked"] { color: var(--warning); background: #f9e6df; }
+  .pill[data-tone="done"] { color: #154e28; background: #d7efd7; }
+  .pill[data-tone="active"] { color: #1d4c66; background: #e1eef6; }
+  .legend { margin: 13px 0; gap: 7px; }
+  .tools { margin: 14px 0; }
+  .tools .actions { flex: 1 1 auto; }
+  .tools select { max-width: 100%; }
+  .tools input { width: min(100%, 290px); }
+  .board-hint { margin-bottom: 10px; }
+  .board {
+    display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px; overflow-x: auto; padding: 3px 3px 10px;
+  }
+  .lane { min-width: 0; background: #e8ebe3; border: 2px solid transparent; border-radius: 15px; padding: 12px; min-height: 230px; }
+  .lane[data-lane="active"] { background: #e3ebf0; }
+  .lane[data-lane="blocked"] { background: #f3e9e0; }
+  .lane[data-lane="done"] { background: #e2eddf; }
+  .lane.is-target { border-color: var(--green); }
+  .lane-head { display: flex; align-items: center; gap: 8px; margin-bottom: 11px; }
+  .lane-head h3 { font-size: 15px; margin-right: auto; }
+  .lane-dot { width: 9px; height: 9px; border-radius: 50%; background: #637471; }
+  [data-lane="active"] .lane-dot { background: #3b6f8f; }
+  [data-lane="blocked"] .lane-dot { background: #a54b25; }
+  [data-lane="done"] .lane-dot { background: #367043; }
+  .lane-count { font: 12px ui-monospace, Consolas, monospace; padding: 3px 6px; border-radius: 5px; background: #ffffffa6; }
+  .lane-stack { display: grid; gap: 8px; }
+  .kanban-card {
+    background: var(--paper); border: 1px solid #c9d5c9; border-radius: 10px;
+    padding: 9px 10px 10px; box-shadow: 0 2px 3px #162c2610; cursor: grab;
+  }
+  .kanban-card.is-dragging { opacity: .5; cursor: grabbing; }
+  .card-meta { display: flex; justify-content: space-between; gap: 6px; align-items: center; }
+  .card-meta .task-id { margin: 0; }
+  .grip { font-weight: 700; letter-spacing: 2px; color: var(--muted); user-select: none; }
+  .open-card {
+    display: block; text-align: start; font-weight: 700; line-height: 1.45;
+    border: 0; border-radius: 3px; background: transparent; padding: 4px 0; width: 100%;
+  }
+  .open-card:hover { text-decoration: underline; }
+  .card-foot { margin-top: 3px; color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+  .open-card, .lane-empty { overflow-wrap: anywhere; }
+  .lane-empty { font-size: 13px; color: var(--muted); padding: 12px 3px; }
+  dialog {
+    width: min(620px, calc(100% - 28px)); padding: 0; border: 1px solid var(--line);
+    border-radius: 15px; color: var(--ink); background: var(--paper);
+    max-height: calc(100% - 32px);
+  }
+  dialog::backdrop { background: #102b22a6; }
+  .dialog-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 12px 14px; border-bottom: 1px solid var(--line); }
+  .task { padding: 14px; }
+  .task-head { align-items: start; }
+  .task-title { flex: 1 1 230px; }
+  .task-id { color: var(--green); font: 12px ui-monospace, Consolas, monospace; display: block; margin-bottom: 3px; }
+  .task p { margin-top: 7px; }
+  .criterion { border-left: 3px solid #8eae9b; padding-left: 9px; }
+  .dependencies a { margin-inline: 3px 5px; white-space: nowrap; }
+  .task .fields { margin-top: 10px; }
+  .fields { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 12px; padding-top: 5px; }
+  .fields label { display: grid; gap: 4px; font-size: 13px; }
+  .fields .wide { grid-column: 1 / -1; }
+  .fields input, .fields textarea { width: 100%; min-width: 0; }
+  .fields textarea { resize: vertical; }
+  .save-message { margin-top: 8px; overflow-wrap: anywhere; }
+  .foot { margin-block: 18px 25px; padding-top: 10px; border-top: 1px solid var(--line); }
+  [hidden] { display: none !important; }
+  @media (max-width: 720px) {
+    .phase-nav { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .board { grid-template-columns: repeat(4, minmax(205px, 1fr)); }
+    .hero { grid-template-columns: 1fr; gap: 13px; }
+    .hero-side { border-left: 0; border-top: 1px solid #688377; padding: 12px 0 0; }
+  }
+  @media (max-width: 425px) {
+    .wrap { width: calc(100% - 24px); }
+    .fields { grid-template-columns: 1fr; }
+    .tools input { width: 100%; }
+  }
+</style>
+</head>
+<body>
+<header class="masthead">
+  <div class="wrap topbar">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 12h2m2-4v8m5-12v16m5-12v8m2-4h2"/></svg></span>
+      จดประชุม
+    </div>
+    <div class="actions">
+      <button type="button" id="export">ส่งออกสถานะ JSON</button>
+      <button type="button" id="import">นำเข้าสถานะ</button>
+      <input type="file" id="import-file" accept=".json,application/json" hidden>
+    </div>
+  </div>
+</header>
+<main class="wrap">
+  <section class="hero" aria-labelledby="title">
+    <div>
+      <p class="small muted" id="current-phase"></p>
+      <h1 id="title">แผนงานแอปจดประชุม</h1>
+      <p class="muted">ถอดเสียงไทยบน Windows · ระบุผู้พูดด้วยปุ่มลัด · เก็บข้อมูลในเครื่อง</p>
+    </div>
+    <div class="hero-side">
+      <div><span class="small muted">รุ่นที่ยืนยันว่าปล่อยแล้ว</span><strong id="released"></strong></div>
+      <div><span class="small muted">งานถัดไปที่ทำได้</span><strong id="next-task"></strong></div>
+    </div>
+  </section>
+  <nav class="phase-nav" id="phase-nav" aria-label="เลือกเฟส"></nav>
+  <section aria-labelledby="phase-title">
+    <header class="phase-head">
+      <div><h2 id="phase-title"></h2><p class="muted" id="phase-description"></p></div>
+      <span id="phase-status" class="pill"></span>
+    </header>
+    <div class="tools">
+      <div class="actions">
+        <select id="group-filter" aria-label="เลือกช่วงงาน"></select>
+        <input type="search" id="search" aria-label="ค้นหางาน" placeholder="ค้นหาเลขงาน ชื่องาน หรือเกณฑ์ผ่าน">
+      </div>
+    </div>
+    <p class="board-hint small muted">ลากการ์ดไปคอลัมน์ใหม่ หรือเปิดการ์ดแล้วเลือกสถานะ</p>
+    <div class="board" id="board" aria-label="บอร์ดสถานะงาน"></div>
+    <dialog id="task-dialog" aria-labelledby="task-title">
+      <div class="dialog-head"><strong>รายละเอียดงาน</strong><form method="dialog"><button>ปิด</button></form></div>
+      <div id="task-detail"></div>
+    </dialog>
+  </section>
+  <footer class="foot small muted">
+    <p>อัปเดตสถานะ ผู้รับผิดชอบ และหลักฐานด้วยมือ เปอร์เซ็นต์นับจากงานที่ทำเสร็จในแต่ละเฟส</p>
+    <p>สถานะบันทึกในเบราว์เซอร์นี้เมื่อพื้นที่จัดเก็บพร้อมใช้ ส่งออก JSON เพื่อสำรองหรือเปิดต่อในเครื่องอื่น</p>
+    <p class="save-message" id="save-message" role="status"></p>
+  </footer>
+</main>
+<script>
+  "use strict";
+  const roadmap = [
+    [1, "บันทึกประชุมออฟไลน์", "v0.1.x", "อัดเสียง ระบุผู้พูด ถอดภาษาไทย เปิดฟัง แก้ไข และส่งออกได้บน Windows", [
+      ["1.1 วางแผนและตั้ง GitHub", [
+        ["A01", "กำหนดขอบเขตและรุ่นของเฟส 1", "", "กำหนดจุดเริ่มและจบของแอป รวมถึงลำดับ alpha, beta และรุ่นแรก", "มีข้อตกลงเบื้องต้นว่าใช้ Windows ไมค์เดียว ระบุผู้พูดเอง และถอดเสียงแบบออฟไลน์"],
+        ["A02", "ทำภาพตัวอย่างหน้าจอประชุม", "A01", "แสดงชื่อผู้พูด ปุ่มลัด สถานะบันทึก และข้อความตามเวลา", "มี HTML ตัวอย่างที่กดสลับผู้พูดได้", "preview/meeting-notes.html"],
+        ["A03", "ทำหน้าติดตามเฟสและงาน", "A01", "จัดหมวดงานและระบุสถานะ เงื่อนไขก่อนเริ่ม และเกณฑ์ผ่าน", "มีไฟล์ HTML ติดตามงานพร้อมส่งออกและนำเข้าสถานะ", "project-tracker.html"],
+        ["A04", "สร้าง repo สาธารณะและเตรียมสัญญาอนุญาต", "A01", "เพิ่ม README, LICENSE, CONTRIBUTING, .gitignore และคำเตือนเรื่องไฟล์ประชุมตัวจริง", "มี repo เปิดอ่านได้และตรวจว่าไม่มีไฟล์ประชุมจริง ฐานข้อมูล หรือคีย์อยู่ใน Git"],
+        ["A05", "ตั้ง GitHub Projects และ Milestone เฟส 1", "A04", "สร้างมุมมองงานในเฟส บอร์ดสถานะ และ Issues ย่อยพร้อมเกณฑ์ผ่าน", "หน้า README พาไปถึงบอร์ดและ Milestone ได้ และ Issue ระบุเงื่อนไขหลักของงาน"],
+        ["A06", "ทดลอง Rust และหน้าจอภาษาไทย", "A01", "ลองแสดงอักษรไทย วรรณยุกต์ การพิมพ์ การแปะ และปุ่มลัดใน UI ที่เลือก", "มีผลทดสอบบน Windows และระบุไลบรารี UI พร้อมเหตุผลที่เลือก"],
+        ["A07", "ตั้งโครง Rust และตรวจอัตโนมัติบน Windows", "A04 A06", "ตรึงเครื่องมือและไลบรารี บันทึกคำสั่ง build แล้วตั้งให้ CI ตรวจ format, lint, test และ build", "เครื่องใหม่ build ตามคู่มือได้และมีผล CI ของ PR บน Windows"]
+      ]],
+      ["1.2 อัดเสียงและระบุผู้พูด · Alpha 1", [
+        ["B01", "เลือกและทดสอบไมค์", "A07", "แสดงไมค์ที่ใช้ได้ ค่าเริ่มต้น ระดับสัญญาณ และข้อความเมื่อระบบปฏิเสธสิทธิ์", "เลือกไมค์ ทดสอบก่อนอัด และได้รับคำแนะนำเมื่อไมค์ใช้ไม่ได้"],
+        ["B02", "เริ่ม หยุด และเขียนเสียงลงดิสก์", "B01", "แยกการรับเสียงจาก UI และเขียน WAV ต่อเนื่อง จำกัดขนาดบัฟเฟอร์เสียง", "อัดและเปิดฟังไฟล์ 60 นาทีได้ และ UI ยังตอบสนอง"],
+        ["B03", "สร้างโครงจัดเก็บการประชุมใน SQLite", "A07", "ให้แต่ละการประชุมมีรหัส โฟลเดอร์เสียง รายชื่อผู้พูด และ schema version", "เปิดบันทึกเดิมได้หลังปิดแอป และมีวิธีอัปเกรด schema ที่ทดสอบได้"],
+        ["B04", "สร้างรายชื่อและปุ่มลัดระบุคนพูด", "B02 B03", "เริ่มจากไม่ทราบผู้พูด กด 1–3 หรือคลิกชื่อเพื่อบันทึกจุดเปลี่ยนบนเวลาเสียงจริง", "สลับชื่อได้โดยเสียงอัดต่อ ปุ่มซ้ำไม่สร้างจุดเปลี่ยนซ้ำ และพิมพ์ตัวเลขในช่องกรอกได้"],
+        ["B05", "แสดงสถานะการอัดและเวลา", "B04", "แสดงไมค์ที่ใช้ เวลาบันทึก คนที่ถูกระบุ และช่วงสัญญาณขาดหาย", "ผู้ใช้แยกได้ทันทีว่าอยู่ระหว่างอัด จบแล้ว หรือมีปัญหา"],
+        ["B06", "รับมือไมค์หลุด ดิสก์เต็ม และอัดไม่ทัน", "B02 B03", "บันทึกสาเหตุและเวลาเมื่อเสียงขาด หยุดอย่างปลอดภัยเมื่อเขียนต่อไม่ได้", "ทดสอบติดขัดแต่ละกรณีแล้วแอปแจ้งเหตุและเปิดส่วนที่บันทึกเสร็จได้"],
+        ["B07", "เปิดฟังการประชุมและทดสอบเวลา", "B04 B06", "เปิดเสียงที่อัดและเลื่อนไปยังจุดเปลี่ยนคนที่บันทึกไว้", "จุดเปลี่ยนช่วงต้น กลาง และท้ายไฟล์ 60 นาทีตรงกับเกณฑ์เวลาที่บันทึกไว้ในผลทดสอบ"],
+        ["B08", "ปล่อย ZIP ทดสอบ Alpha 1", "A05 B05 B07", "สร้าง Windows x64 ZIP พร้อมวิธีเปิดและรายการสิ่งที่อยากให้เพื่อนลอง", "ดาวน์โหลด pre-release จาก GitHub แล้วเปิดได้บนเครื่องทดสอบที่ไม่ได้ลง Rust"]
+      ]],
+      ["1.3 ถอดภาษาไทยบนเครื่อง · Alpha 2", [
+        ["C01", "ผูก whisper.cpp กับงานถอดเบื้องหลัง", "A07", "ประเมินวิธีเชื่อม Rust กับเอนจินและตรึงรุ่นที่ build ได้บน Windows", "build บนเครื่องเป้าหมายและถอด WAV ภาษาไทยตัวอย่างได้"],
+        ["C02", "เลือกไฟล์โมเดลและตรวจความพร้อม", "C01", "เริ่มจาก Whisper small หลายภาษา รองรับเลือกโมเดลที่เตรียมไว้ในเครื่องและแจ้งเมื่อไฟล์เปิดไม่ได้", "เมื่อปิดเน็ต แอปใช้ไฟล์ที่เตรียมไว้ได้ และไฟล์ผิดชนิดมีข้อความที่ผู้ใช้แก้ตามได้"],
+        ["C03", "จัดคิวงานถอดและบันทึกความคืบหน้า", "B02 B03 C02", "แยกคิวจากการอัด จัดการสถานะรอ กำลังถอด เสร็จ และผิดพลาด", "ถอดอยู่ขณะอัดได้ หยุดอัดแล้วทำต่อได้ และงานค้างเปิดกลับมาลองใหม่ได้โดยไม่เกิดช่วงซ้ำ"],
+        ["C04", "ผูกเวลาและป้ายผู้พูดกับข้อความ", "B04 C03", "แปลงเวลาในผลถอดให้ตรงกับไฟล์เสียงและกำหนดวิธีจัดการประโยคที่คร่อมจุดเปลี่ยน", "ทดสอบช่วงที่กดเปลี่ยนเร็ว กดช้า และไม่มีป้ายผู้พูด โดยฟังเทียบกับเสียง"],
+        ["C05", "ประเมินคุณภาพและความเร็วภาษาไทย", "C04", "ใช้เสียงตัวอย่างที่อนุญาตให้ใช้ เทียบระยะเวลาถอด ชื่อคน ศัพท์ และไทยสลับอังกฤษ", "มีผลวัดที่ระบุเครื่อง รุ่นโมเดล ตัวตั้งค่า และกรณีที่อ่านผิด พร้อมค่าแนะนำสำหรับรุ่นแรก"],
+        ["C06", "ปล่อย Alpha 2 สำหรับลองถอดออฟไลน์", "B08 C05", "เพิ่มคู่มือเตรียมโมเดลและข้อจำกัดด้านความเร็ว", "ดาวน์โหลด ZIP จาก pre-release และลองอัดพร้อมถอดในโหมดออฟไลน์ได้"]
+      ]],
+      ["1.4 ตรวจทาน ส่งออก และติดตั้ง · Beta 1", [
+        ["D01", "เปิดรายการประชุมย้อนหลัง", "B03 C04", "เรียงตามเวลา แสดงชื่อและสถานะของแต่ละการประชุม เปิดจากข้อมูลในเครื่อง", "ปิดแล้วเปิดใหม่และเข้าถึงไฟล์ย้อนหลังได้ หากเสียงหายมีข้อความอธิบาย"],
+        ["D02", "คลิกเวลาเพื่อฟังเสียงและเลื่อนตำแหน่ง", "D01 B07", "เชื่อมช่วงข้อความกับตำแหน่งเล่นและแสดงสถานะเล่นหรือหยุด", "คลิกแถวช่วงต้นและท้ายแล้วเปิดตรงช่วงที่เลือก"],
+        ["D03", "แก้ข้อความและป้ายผู้พูด", "D02", "แก้ชื่อผู้พูดของช่วง เปลี่ยนจุดแบ่ง และเก็บผลแก้แยกจากผลถอดเดิม", "เปิดใหม่แล้วผลแก้ยังอยู่ และถอดซ้ำไม่เขียนทับงานที่แก้"],
+        ["D04", "ส่งออก TXT และ JSON", "D03", "ระบุช่วงเวลา ผู้พูด และข้อความฉบับล่าสุด ใช้ UTF-8 และกำหนดเวอร์ชัน JSON", "ส่งออกภาษาไทยไม่เพี้ยนและผลทั้งสองรูปแบบตรงกับหน้าตรวจทาน"],
+        ["D05", "กู้การประชุมที่จบไม่สมบูรณ์", "B06 D01", "ทดสอบบังคับปิดกลางการอัดและงานถอด ระบุช่วงข้อมูลที่เขียนเสร็จแล้ว", "เปิดใหม่แล้วกู้หรือเปิดเสียงส่วนที่ลงดิสก์ได้ พร้อมแจ้งช่วงที่ไม่สมบูรณ์"],
+        ["D06", "สร้างตัวติดตั้ง Windows x64", "D04", "แพ็กตัวแอปและส่วนประกอบที่ต้องใช้ จัดการตำแหน่งข้อมูลนอกโฟลเดอร์ติดตั้ง และใส่สิทธิ์ไลบรารีที่แจก", "ติดตั้งและถอนบน Windows ที่ไม่มี Rust ได้ และไฟล์ประชุมยังอยู่เมื่ออัปเดต"],
+        ["D07", "ปล่อย Beta 1 ให้เพื่อนทดลอง", "C06 D05 D06", "ทำคู่มือภาษาไทยสำหรับติดตั้ง เตรียมโมเดล ใช้งาน และแจ้งปัญหา", "ผู้ทดสอบอย่างน้อยหนึ่งคนทำครบตั้งแต่ดาวน์โหลดจนถึงส่งออก และบันทึกผลไว้ใน Issue"]
+      ]],
+      ["1.5 ตรวจรับและปล่อย v0.1.0", [
+        ["E01", "ตรวจรับแบบตัดอินเทอร์เน็ตบน Windows", "D07", "ทดสอบติดตั้ง เปิดแอป ใช้โมเดลที่เตรียมไว้ อัด สลับผู้พูด แก้ข้อความ และส่งออก", "บันทึกผลเครื่องและรุ่น Windows ที่ทดสอบ พร้อมผลการอัด 60 นาที"],
+        ["E02", "ตรวจการกู้คืนและอัปเดตจาก Beta", "D07", "ทดสอบไมค์หลุด พื้นที่เต็ม ปิดกลางทาง และอัปเดตเมื่อมีไฟล์ประชุมเดิม", "ข้อผิดพลาดที่ทำให้ไฟล์หายโดยไม่แจ้งถูกแก้แล้ว และข้อมูลเดิมเปิดได้หลังอัปเดต"],
+        ["E03", "ตรวจแพ็กเกจ สัญญาอนุญาต และไฟล์ใน Git", "D06", "ตรวจลิขสิทธิ์โค้ด ไลบรารีและโมเดล ไฟล์ตัวอย่าง ขนาดแพ็กเกจ และ checksum", "รายการสิทธิ์และ SHA-256 พร้อมเผยแพร่ และไม่มีไฟล์ประชุมจริงในแพ็กเกจหรือ repo"],
+        ["E04", "เผยแพร่รุ่น v0.1.0 และปิด Milestone", "E01 E02 E03", "สร้าง tag และ Release พร้อมตัวติดตั้ง คู่มือออฟไลน์ และข้อจำกัดที่พบจริง", "หน้า Release มีลิงก์ดาวน์โหลดที่ลองแล้ว README ชี้ไปยังรุ่นนี้ และบันทึกผลตรวจรับครบ"]
+      ]]
+    ]],
+    [2, "ลดงานระหว่างประชุม", "v0.2.x", "ลดเวลารอและช่วยระบุจุดเปลี่ยนผู้พูด พร้อมให้ผู้ใช้ตรวจและแก้ได้", [
+      ["2.1 ความเร็วและคำศัพท์", [
+        ["F01", "เก็บผลใช้งานจริงจากเฟส 1", "E04", "จัดลำดับจากความเร็ว คำถอดผิด และการกดสลับคน", "มีปัญหาที่จะทำในเฟส 2 พร้อมตัวอย่างและเกณฑ์วัดที่ตกลงแล้ว"],
+        ["F02", "ลดเวลารอข้อความบนเครื่องเป้าหมาย", "F01", "เทียบขนาดช่วงเสียง โมเดล และการตั้งค่า CPU กับข้อมูลเดิม", "วัดการหน่วงและคุณภาพก่อนกับหลัง และเผยผลประกอบการเลือกรุ่น"],
+        ["F03", "รองรับรายชื่อและคำศัพท์เฉพาะ", "F01", "ให้แก้รายการคำทดสอบโดยเก็บไว้ในเครื่อง", "เทียบชื่อคนและศัพท์ก่อนและหลัง พร้อมตรวจว่าประโยคทั่วไปยังถอดได้"],
+        ["F04", "เสนอจุดเปลี่ยนผู้พูดในเครื่อง", "F01", "ประเมินเอนจินที่ใช้ได้ออฟไลน์และแสดงเป็นข้อเสนอพร้อมเวลา", "มีผลเทียบเสียงไทยที่พูดแทรกและเปลี่ยนผู้พูดเร็ว ผู้ใช้กดยืนยันหรือปฏิเสธได้"],
+        ["F05", "ตรวจและปล่อยรุ่น v0.2.0", "F02 F03 F04", "ตรวจการถอดออฟไลน์และเปิดการประชุมจากเฟส 1", "ตรวจรับครบและมี Release Windows พร้อมบันทึกการเปลี่ยนแปลง"]
+      ]]
+    ]],
+    [3, "ทำงานต่อหลังประชุม", "v0.3.x", "ค้นข้ามการประชุม ดึงมติและงาน และกระโดดกลับไปยังเสียงต้นทาง", [
+      ["3.1 ค้นและทำบันทึกต่อ", [
+        ["G01", "ค้นชื่อและข้อความภาษาไทยข้ามประชุม", "F05", "ออกแบบวิธีค้นคำไทยและการข้ามไปยังช่วงข้อความ", "ค้นจากตัวอย่างภาษาไทยได้และกดไปยังเสียงช่วงที่ตรงกัน"],
+        ["G02", "บันทึกมติและงานพร้อมเวลาอ้างอิง", "G01", "เพิ่มรายการแก้ไขได้ เชื่อมกลับผู้พูดและช่วงต้นทาง", "มีมติหรืองานพร้อมลิงก์กลับไปฟังที่ตรวจได้"],
+        ["G03", "ทดลองช่วยสรุปในเครื่อง", "G02", "ประเมินวิธีบนเครื่องและให้ผู้ใช้ตรวจข้อเสนอทีละรายการ", "วัดการแต่งข้อมูลและตรวจว่าข้อเสนออ้างถึงช่วงต้นทางได้"],
+        ["G04", "ตรวจและปล่อยรุ่น v0.3.0", "G03", "ตรวจการเปิดข้อมูลรุ่นก่อน การค้น และผลลัพธ์ที่ส่งออก", "ตรวจรับครบและมี Release Windows พร้อมคู่มือ"]
+      ]]
+    ]],
+    [4, "เตรียมใช้งานวงกว้าง", "v1.0.x", "ให้ติดตั้ง อัปเดต สำรอง และกู้ข้อมูลได้ตามคู่มือ", [
+      ["4.1 ความพร้อมของรุ่น 1.0", [
+        ["H01", "ตรวจตัวติดตั้งและขั้นตอนอัปเดต", "G04", "กำหนด Windows ที่รองรับและทดสอบการอัปเดตจากรุ่นก่อน", "มีผลทดสอบติดตั้งใหม่ อัปเดต และถอนโปรแกรมโดยจัดการข้อมูลตามที่แจ้งไว้"],
+        ["H02", "สำรองและกู้ข้อมูลทั้งการประชุม", "G04", "เตรียมวิธีสำรองไฟล์เสียง ฐานข้อมูล และค่าที่ต้องใช้", "กู้บนเครื่องอื่นได้ครบพร้อมตรวจตำแหน่งเสียงและข้อความ"],
+        ["H03", "ปรับคู่มือ การเข้าถึง และรายการรุ่นที่รองรับ", "H01 H02", "ทดสอบคีย์บอร์ด ขนาดหน้าจอ ภาษาไทย และขั้นตอนรายงานปัญหา", "ผู้ทดสอบทำงานหลักและแจ้งปัญหาได้จากคู่มือ"],
+        ["H04", "ตรวจและปล่อยรุ่น v1.0.0", "H03", "ทบทวนบั๊กขวางรุ่น แพ็กเกจ และวิธีย้อนกลับ", "ตรวจรับครบ มี Release และอัปเดต README กับ Milestone"]
+      ]]
+    ]]
+  ];
+
+  const statuses = {
+    todo: ["ยังไม่เริ่ม", ""],
+    active: ["กำลังทำ", "active"],
+    review: ["รอตรวจ", "active"],
+    blocked: ["ติดปัญหา", "blocked"],
+    done: ["เสร็จ", "done"]
+  };
+  const releases = [
+    ["B08", "v0.1.0-alpha.1"], ["C06", "v0.1.0-alpha.2"],
+    ["D07", "v0.1.0-beta.1"], ["E04", "v0.1.0"],
+    ["F05", "v0.2.0"], ["G04", "v0.3.0"], ["H04", "v1.0.0"]
+  ];
+  const byId = id => document.getElementById(id);
+  const storeKey = "meeting-notes-project-tracker.v1";
+  const phases = roadmap.map(([number, title, version, description, groups]) => ({
+    number, title, version, description,
+    groups: groups.map(([name, entries], index) => ({
+      id: `phase-${number}-group-${index}`, name,
+      tasks: entries.map(([id, title, dependencies, description, criterion, artifact]) => ({
+        id, title, dependencies: dependencies.split(" ").filter(Boolean),
+        description, criterion, artifact, phase: number
+      }))
+    }))
+  }));
+  for (const phase of phases) phase.tasks = phase.groups.flatMap(group => group.tasks);
+  const tasks = new Map(phases.flatMap(phase => phase.tasks).map(task => [task.id, task]));
+  const initial = {
+    A01: { status: "done", note: "กำหนดขอบเขตและแผนรุ่นเบื้องต้นแล้ว" },
+    A02: { status: "done", note: "มีหน้าจอตัวอย่างและตรวจไวยากรณ์สคริปต์แล้ว" },
+    A03: { status: "done", note: "มีไฟล์แผนงานฉบับนี้" }
+  };
+  const fallback = { status: "todo", owner: "", link: "", note: "", updated: "" };
+  let state = load();
+  let selectedPhase = phases.find(phase => phase.tasks.some(task => get(task.id).status !== "done"))?.number ?? 1;
+  let activeCard;
+  let draggedCard;
+  const lanes = [["todo", "ยังไม่เริ่ม"], ["active", "กำลังทำ"], ["blocked", "ติดปัญหา"], ["done", "ทำเสร็จแล้ว"]];
+
+  function clean(data) {
+    if (!data || data.version !== 1 || !data.tasks || typeof data.tasks !== "object" || Array.isArray(data.tasks)) {
+      throw new Error("รูปแบบไฟล์สถานะไม่ตรงกับแผนงานนี้");
+    }
+    const result = {};
+    for (const [id, item] of Object.entries(data.tasks)) {
+      if (!tasks.has(id)) continue;
+      if (!item || typeof item !== "object" || !Object.hasOwn(statuses, item.status)) {
+        throw new Error(`สถานะของงาน ${id} ใช้ไม่ได้`);
+      }
+      result[id] = { status: item.status };
+      for (const [field, limit] of Object.entries({ owner: 100, link: 500, note: 1200, updated: 40 })) {
+        result[id][field] = typeof item[field] === "string" ? item[field].slice(0, limit) : "";
+      }
+    }
+    if (!Object.keys(result).length) throw new Error("ไฟล์นี้ไม่มีรหัสงานที่ตรงกับแผนงาน");
+    return result;
+  }
+
+  function load() {
+    try {
+      const saved = localStorage.getItem(storeKey);
+      return saved ? clean(JSON.parse(saved)) : {};
+    } catch {
+      byId("save-message").textContent = "เปิดสถานะเดิมไม่ได้ กำลังแสดงข้อมูลเริ่มต้น";
+      return {};
+    }
+  }
+
+  function persist(message) {
+    try {
+      localStorage.setItem(storeKey, JSON.stringify({ version: 1, tasks: state }));
+      byId("save-message").textContent = message;
+    } catch {
+      byId("save-message").textContent = "เบราว์เซอร์บันทึกสถานะไม่ได้ การแก้ไขยังอยู่ในหน้านี้ ให้ส่งออก JSON ก่อนปิด";
+    }
+  }
+
+  function get(id) {
+    return { ...fallback, ...initial[id], ...state[id] };
+  }
+
+  function unmet(task) {
+    return task.dependencies.filter(id => get(id).status !== "done");
+  }
+
+  function counts(phase) {
+    const result = { todo: 0, active: 0, review: 0, blocked: 0, done: 0 };
+    for (const task of phase.tasks) result[get(task.id).status]++;
+    return result;
+  }
+
+  function escaped(value) {
+    return String(value).replace(/[&<>"']/g, char => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+    })[char]);
+  }
+
+  function evidenceLink(value) {
+    try {
+      const url = new URL(value);
+      return url.protocol === "https:" ? url.href : "";
+    } catch {
+      return "";
+    }
+  }
+
+  function options(selection) {
+    return Object.entries(statuses).map(([key, [name]]) =>
+      `<option value="${key}" ${key === selection ? "selected" : ""}>${name}</option>`
+    ).join("");
+  }
+
+  function dateText(value) {
+    const date = new Date(value);
+    return Number.isNaN(date.valueOf()) ? "" : `แก้ไขล่าสุด ${new Intl.DateTimeFormat("th-TH", {
+      dateStyle: "medium", timeStyle: "short"
+    }).format(date)}`;
+  }
+
+  function taskMarkup(task) {
+    const item = get(task.id);
+    const waiting = unmet(task);
+    const link = evidenceLink(item.link);
+    const related = task.dependencies.map(id =>
+      `<a href="#task-${id}" data-jump="${id}" aria-label="${id} ${escaped(tasks.get(id).title)}">${id}</a>`
+    ).join("");
+    return `<article class="task" id="task-${task.id}" data-task="${task.id}">
+      <div class="task-head">
+        <div class="task-title"><span class="task-id">${task.id}</span><h3 id="task-title">${task.title}</h3></div>
+        <label>ย้ายสถานะ <select data-field="status" aria-label="เปลี่ยนสถานะ ${task.id}">${options(item.status)}</select></label>
+      </div>
+      <p>${task.description}</p>
+      <p class="criterion"><strong>เกณฑ์ผ่าน</strong> ${task.criterion}</p>
+      ${related ? `<p class="small dependencies"><strong>งานก่อนหน้า</strong> ${related}
+        ${waiting.length ? `<span class="pill" data-tone="blocked">ยังรอ ${waiting.join(", ")}</span>` : ""}</p>` : ""}
+      ${task.artifact ? `<p class="small"><a href="${task.artifact}">เปิดไฟล์งาน</a></p>` : ""}
+        <div class="fields">
+          <label>ผู้รับผิดชอบ<input data-field="owner" maxlength="100" value="${escaped(item.owner)}"></label>
+          <label>ลิงก์ Issue, PR หรือผลทดสอบ<input type="url" data-field="link" maxlength="500" placeholder="https://…" value="${escaped(item.link)}"></label>
+          <label class="wide">บันทึกผลทดสอบหรือปัญหาที่ติดอยู่<textarea data-field="note" rows="2" maxlength="1200">${escaped(item.note)}</textarea></label>
+        </div>
+        <p class="small"><a class="evidence" href="${escaped(link)}" target="_blank" rel="noopener noreferrer" ${link ? "" : "hidden"}>เปิดหลักฐาน</a>
+          <span class="muted updated">${dateText(item.updated)}</span></p>
+    </article>`;
+  }
+
+  function renderOverview() {
+    const current = phases.find(phase => phase.tasks.some(task => get(task.id).status !== "done"));
+    const next = current?.tasks.find(task => get(task.id).status === "active" && !unmet(task).length)
+      ?? current?.tasks.find(task => get(task.id).status === "review" && !unmet(task).length)
+      ?? current?.tasks.find(task => get(task.id).status === "todo" && !unmet(task).length);
+    byId("current-phase").textContent = current ? `เฟสปัจจุบัน ${current.number} จาก ${phases.length} · ${current.title}` : "ครบทุกเฟสตามแผน";
+    byId("released").textContent = releases.findLast(([id]) => get(id).status === "done")?.[1] ?? "ยังไม่มีรุ่นเผยแพร่";
+    byId("next-task").textContent = next ? `${next.id} · ${next.title}` : current ? "ตรวจงานที่ติดปัญหาหรือรอเงื่อนไข" : "ครบทุกงานในแผน";
+    byId("phase-nav").innerHTML = phases.map(phase => {
+      const done = counts(phase).done;
+      const total = phase.tasks.length;
+      return `<button type="button" data-phase="${phase.number}" aria-pressed="${phase.number === selectedPhase}">
+        <span class="small muted">เฟส ${phase.number} · ${phase.version}${phase === current ? " · ปัจจุบัน" : ""}</span>
+        <strong>${phase.title}</strong>
+        <progress value="${done}" max="${total}" aria-label="งานที่เสร็จในเฟส ${phase.number}"></progress>
+        <span class="small">${done}/${total} งาน · ${Math.round(done / total * 100)}%</span>
+      </button>`;
+    }).join("");
+    const phase = phases[selectedPhase - 1];
+    const phaseCount = counts(phase);
+    const summary = byId("phase-status");
+    const phaseStatus = phaseCount.done === phase.tasks.length ? "done"
+      : phaseCount.blocked ? "blocked" : phaseCount.done || phaseCount.active || phaseCount.review ? "active" : "todo";
+    summary.textContent = phaseStatus === "blocked" ? "มีงานติดปัญหา" : statuses[phaseStatus][0];
+    summary.dataset.tone = statuses[phaseStatus][1];
+    byId("phase-title").textContent = `เฟส ${phase.number} · ${phase.title}`;
+    byId("phase-description").textContent = phase.description;
+  }
+
+  function renderBoard() {
+    const phase = phases[selectedPhase - 1];
+    const groupId = byId("group-filter").value;
+    const search = byId("search").value.trim().toLocaleLowerCase("th");
+    const visible = phase.groups.filter(group => search || !groupId || group.id === groupId)
+      .flatMap(group => group.tasks)
+      .filter(task => !search || [task.id, task.title, task.description, task.criterion, get(task.id).owner]
+        .join(" ").toLocaleLowerCase("th").includes(search));
+    byId("board").innerHTML = lanes.map(([lane, name]) => {
+      const cards = visible.filter(task => {
+        const { status } = get(task.id);
+        return status === lane || (status === "review" && lane === "active");
+      });
+      const markup = cards.map(task => {
+        const item = get(task.id);
+        const waiting = unmet(task);
+        const detail = item.status === "review" ? "รอตรวจ"
+          : item.owner ? item.owner
+          : item.status === "todo" ? (waiting.length ? `รองาน ${waiting.join(", ")}` : "พร้อมเริ่ม") : "";
+        return `<article class="kanban-card" data-card="${task.id}" draggable="true">
+          <div class="card-meta"><span class="task-id">${task.id}</span><span class="grip" aria-hidden="true">⠿</span></div>
+          <button class="open-card" type="button" data-open="${task.id}">${task.title}</button>
+          ${detail ? `<p class="card-foot">${escaped(detail)}</p>` : ""}
+        </article>`;
+      }).join("");
+      return `<section class="lane" data-lane="${lane}" aria-label="${name}">
+        <div class="lane-head"><span class="lane-dot" aria-hidden="true"></span><h3>${name}</h3><span class="lane-count">${cards.length}</span></div>
+        <div class="lane-stack">${markup || '<p class="lane-empty">ยังไม่มีการ์ด</p>'}</div>
+      </section>`;
+    }).join("");
+  }
+
+  function render() {
+    renderOverview();
+    renderBoard();
+  }
+
+  function setGroupFilter() {
+    const groups = phases[selectedPhase - 1].groups;
+    byId("group-filter").innerHTML = '<option value="">ทุกช่วงในเฟสนี้</option>' + groups.map(group =>
+      `<option value="${group.id}">${group.name}</option>`
+    ).join("");
+    byId("group-filter").value = (groups.find(group => group.tasks.some(task => get(task.id).status !== "done")) ?? groups[0]).id;
+  }
+
+  function selectPhase(number) {
+    selectedPhase = number;
+    byId("search").value = "";
+    setGroupFilter();
+    render();
+  }
+
+  function openTask(id) {
+    activeCard = id;
+    byId("task-detail").innerHTML = taskMarkup(tasks.get(id));
+    if (!byId("task-dialog").open) byId("task-dialog").showModal();
+  }
+
+  function moveTask(id, status) {
+    const task = tasks.get(id);
+    const current = get(id);
+    if (current.status === status) return true;
+    if (status === "done" && unmet(task).length &&
+        !confirm(`งาน ${id} ยังรองานก่อนหน้า ต้องการย้ายไปทำเสร็จแล้วใช่ไหม?`)) return false;
+    state[id] = { ...current, status, updated: new Date().toISOString() };
+    render();
+    persist(`ย้าย ${id} ไป ${statuses[status][0]} แล้ว`);
+    return true;
+  }
+
+  byId("group-filter").addEventListener("change", () => {
+    byId("search").value = "";
+    renderBoard();
+  });
+  byId("search").addEventListener("input", renderBoard);
+  byId("phase-nav").addEventListener("click", event => {
+    const control = event.target.closest("[data-phase]");
+    if (!control) return;
+    selectPhase(Number(control.dataset.phase));
+    byId("phase-nav").querySelector('[aria-pressed="true"]').focus();
+  });
+  const board = byId("board");
+  board.addEventListener("click", event => {
+    const control = event.target.closest("[data-open]");
+    if (control) openTask(control.dataset.open);
+  });
+  board.addEventListener("dragstart", event => {
+    const card = event.target.closest("[data-card]");
+    if (!card) return;
+    draggedCard = card.dataset.card;
+    event.dataTransfer.setData("text/plain", draggedCard);
+    event.dataTransfer.effectAllowed = "move";
+    requestAnimationFrame(() => { if (draggedCard === card.dataset.card) card.classList.add("is-dragging"); });
+  });
+  board.addEventListener("dragover", event => {
+    const lane = event.target.closest("[data-lane]");
+    if (!lane || !draggedCard) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+    board.querySelector(".is-target")?.classList.remove("is-target");
+    lane.classList.add("is-target");
+  });
+  board.addEventListener("dragleave", event => {
+    const lane = event.target.closest("[data-lane]");
+    if (lane && (!event.relatedTarget || !lane.contains(event.relatedTarget))) lane.classList.remove("is-target");
+  });
+  function clearDrag() {
+    draggedCard = undefined;
+    board.querySelector(".is-target")?.classList.remove("is-target");
+    board.querySelector(".is-dragging")?.classList.remove("is-dragging");
+  }
+  board.addEventListener("dragend", clearDrag);
+  board.addEventListener("drop", event => {
+    const lane = event.target.closest("[data-lane]");
+    if (!lane || !draggedCard) return;
+    event.preventDefault();
+    const id = draggedCard;
+    clearDrag();
+    const status = get(id).status;
+    if (status === "review" && lane.dataset.lane === "active") return;
+    if (moveTask(id, lane.dataset.lane)) board.querySelector(`[data-open="${id}"]`)?.focus();
+  });
+  byId("task-dialog").addEventListener("close", () => {
+    (board.querySelector(`[data-open="${activeCard}"]`) ?? byId("group-filter")).focus();
+  });
+  byId("task-detail").addEventListener("click", event => {
+    const shortcut = event.target.closest("[data-jump]");
+    if (!shortcut) return;
+    event.preventDefault();
+    const task = tasks.get(shortcut.dataset.jump);
+    if (selectedPhase !== task.phase) selectPhase(task.phase);
+    const group = phases[task.phase - 1].groups.find(group => group.tasks.includes(task));
+    byId("group-filter").value = group.id;
+    byId("search").value = "";
+    renderBoard();
+    openTask(task.id);
+    byId("task-detail").querySelector("select").focus();
+  });
+  byId("task-detail").addEventListener("change", event => {
+    const field = event.target.dataset.field;
+    if (!field) return;
+    const article = event.target.closest("[data-task]");
+    const id = article.dataset.task;
+    const current = get(id);
+    const value = event.target.value.trim();
+    if (field === "status") {
+      if (!moveTask(id, value)) event.target.value = current.status;
+      article.querySelector(".updated").textContent = dateText(get(id).updated);
+      return;
+    }
+    state[id] = { ...current, [field]: value, updated: new Date().toISOString() };
+    persist(`บันทึกสถานะงาน ${id} แล้ว`);
+    const url = evidenceLink(state[id].link);
+    const link = article.querySelector(".evidence");
+    link.hidden = !url;
+    link.href = url;
+    article.querySelector(".updated").textContent = dateText(state[id].updated);
+    if (field === "owner") renderBoard();
+  });
+  byId("export").addEventListener("click", () => {
+    const snapshot = Object.fromEntries([...tasks.keys()].map(id => [id, get(id)]));
+    const file = new Blob([JSON.stringify({ version: 1, tasks: snapshot }, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(file);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = "meeting-notes-project-status.json";
+    anchor.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  });
+  byId("import").addEventListener("click", () => byId("import-file").click());
+  byId("import-file").addEventListener("change", async event => {
+    const file = event.target.files[0];
+    if (!file) return;
+    try {
+      if (file.size > 1000000) throw new Error("ไฟล์สถานะใหญ่เกิน 1 MB");
+      const imported = clean(JSON.parse(await file.text()));
+      if (confirm(`ใช้สถานะจากไฟล์นี้แทนข้อมูลของ ${Object.keys(imported).length} งานในหน้านี้ใช่ไหม?`)) {
+        state = { ...state, ...imported };
+        persist("นำเข้าสถานะแล้ว");
+        render();
+      }
+    } catch (error) {
+      byId("save-message").textContent = error instanceof SyntaxError ? "ไฟล์ JSON อ่านไม่ได้" : error.message;
+    } finally {
+      event.target.value = "";
+    }
+  });
+  setGroupFilter();
+  render();
+</script>
+</body>
+</html>

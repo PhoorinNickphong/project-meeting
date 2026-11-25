@@ -1,0 +1,27 @@
+# Rust build output and local editor files
+/target/
+/.vscode/
+/.idea/
+
+# Meeting data, model weights, and local configuration
+/.env
+/.env.*
+!/.env.example
+/recordings/
+/meetings/
+/exports/
+/models/
+/meeting-notes-project-status.json
+*.wav
+*.mp3
+*.m4a
+*.flac
+*.sqlite*
+*.db
+*.db-*
+*.gguf
+
+# Local credentials
+*.pem
+*.pfx
+*.key

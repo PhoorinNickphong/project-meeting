@@ -1,0 +1,123 @@
+<div id="meeting-notes-preview" lang="th">
+  <style>
+    #meeting-notes-preview {
+      color-scheme: light dark;
+      --paper: light-dark(#fffcf6, #202321);
+      --rail: light-dark(#eeeae0, #292e2a);
+      --ink: light-dark(#202b26, #f1f0e6);
+      --quiet: light-dark(#52635b, #b3c0b7);
+      --line: light-dark(#d9d8ce, #414a43);
+      --active: light-dark(#154f3e, #a9ddc1);
+      --on-active: light-dark(#fffdf5, #13392d);
+      --mark: light-dark(#a53227, #ffa99c);
+      color: var(--ink);
+      font: 14px/1.55 "Leelawadee UI", Tahoma, system-ui, sans-serif;
+    }
+    #meeting-notes-preview * { box-sizing: border-box; }
+    #meeting-notes-preview h2, #meeting-notes-preview h3, #meeting-notes-preview p { margin: 0; }
+    #meeting-notes-preview .window { overflow: hidden; border: 1px solid var(--line); border-radius: 19px; background: var(--paper); }
+    #meeting-notes-preview .chrome { display: flex; gap: 12px; align-items: center; padding: 14px 22px; background: var(--rail); border-bottom: 1px solid var(--line); }
+    #meeting-notes-preview .brand { display: flex; align-items: center; gap: 9px; font-weight: 700; }
+    #meeting-notes-preview .brand i { width: 25px; height: 25px; padding: 5px; border-radius: 7px; background: var(--active); color: var(--on-active); }
+    #meeting-notes-preview .small { font-size: 12px; color: var(--quiet); }
+    #meeting-notes-preview .layout { display: grid; grid-template-columns: 218px minmax(0,1fr); }
+    #meeting-notes-preview .sidebar { padding: 22px 16px; background: var(--rail); border-right: 1px solid var(--line); }
+    #meeting-notes-preview .sidebar h3 { font-size: 14px; margin-bottom: 4px; }
+    #meeting-notes-preview .speakers { display: grid; gap: 7px; margin-top: 14px; }
+    #meeting-notes-preview button { font: inherit; color: inherit; cursor: pointer; }
+    #meeting-notes-preview .speaker { display: flex; align-items: center; text-align: left; gap: 9px; padding: 8px 9px; min-height: 46px; background: var(--paper); border: 1px solid var(--line); border-radius: 9px; }
+    #meeting-notes-preview .speaker[aria-pressed="true"] { background: var(--active); color: var(--on-active); border-color: var(--active); }
+    #meeting-notes-preview kbd { display: grid; place-items: center; width: 23px; height: 23px; border: 1px solid currentColor; border-radius: 5px; font: 12px ui-monospace, monospace; }
+    #meeting-notes-preview main { padding: 24px clamp(14px, 3vw, 34px); }
+    #meeting-notes-preview .summary { display: flex; justify-content: space-between; flex-wrap: wrap; align-items: center; gap: 12px; }
+    #meeting-notes-preview h2 { color: var(--ink); font-size: clamp(20px, 4vw, 29px); letter-spacing: -.025em; }
+    #meeting-notes-preview .stop { border: 1px solid var(--line); border-radius: 8px; background: var(--paper); padding: 8px 12px; min-height: 42px; }
+    #meeting-notes-preview .stop[disabled] { color: var(--quiet); cursor: default; }
+    #meeting-notes-preview .recording { display: flex; align-items: center; flex-wrap: wrap; gap: 9px; margin-top: 17px; padding: 9px 12px; border-radius: 8px; background: var(--rail); }
+    #meeting-notes-preview .dot { background: var(--mark); width: 8px; height: 8px; border-radius: 50%; }
+    #meeting-notes-preview .clock, #meeting-notes-preview .time { font-family: ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+    #meeting-notes-preview .now { margin-left: auto; }
+    #meeting-notes-preview .transcript { margin-top: 22px; }
+    #meeting-notes-preview .transcript h3 { font-size: 15px; margin-bottom: 8px; }
+    #meeting-notes-preview .entry { display: grid; grid-template-columns: 55px minmax(0,1fr); align-items: start; gap: 12px; padding: 12px 0; border-top: 1px solid var(--line); }
+    #meeting-notes-preview .entry strong { display: block; margin-bottom: 3px; }
+    #meeting-notes-preview .time { padding-top: 3px; font-size: 12px; color: var(--quiet); }
+    #meeting-notes-preview .pending { color: var(--quiet); }
+    #meeting-notes-preview .entry[hidden] { display: none; }
+    @media (max-width: 560px) {
+      #meeting-notes-preview .layout { grid-template-columns: minmax(0,1fr); }
+      #meeting-notes-preview .sidebar { border-right: 0; border-bottom: 1px solid var(--line); padding: 14px; }
+      #meeting-notes-preview .speakers { grid-template-columns: repeat(3, minmax(0,1fr)); }
+      #meeting-notes-preview .speaker { gap: 5px; padding: 6px; font-size: 12px; }
+      #meeting-notes-preview .chrome { padding-inline: 14px; }
+      #meeting-notes-preview .now { margin-left: 0; flex-basis: 100%; }
+    }
+  </style>
+  <div class="window">
+    <header class="chrome">
+      <span class="brand"><i data-lucide="audio-lines" aria-hidden="true"></i> จดประชุม</span>
+      <span class="small">ตัวอย่างหน้าจอ</span>
+    </header>
+    <div class="layout">
+      <aside class="sidebar">
+        <h3>ผู้พูด</h3>
+        <p class="small">คลิกชื่อหรือกดปุ่ม 1–3</p>
+        <div class="speakers" role="group" aria-label="ระบุผู้พูด">
+          <button class="speaker" type="button" data-name="คุณเอ" aria-pressed="false"><kbd>1</kbd> คุณเอ</button>
+          <button class="speaker" type="button" data-name="คุณบี" aria-pressed="true"><kbd>2</kbd> คุณบี</button>
+          <button class="speaker" type="button" data-name="คุณซี" aria-pressed="false"><kbd>3</kbd> คุณซี</button>
+        </div>
+      </aside>
+      <main>
+        <div class="summary">
+          <div><p class="small">ภาษาไทย · ถอดเสียงบนเครื่อง</p><h2>ประชุมทีมประจำสัปดาห์</h2></div>
+          <button class="stop" type="button">หยุดบันทึก</button>
+        </div>
+        <div class="recording" role="status">
+          <span class="dot"></span><strong class="status">กำลังบันทึก</strong>
+          <span class="clock">00:01:24</span>
+          <span class="now small">ผู้พูดตอนนี้ <b class="active-name">คุณบี</b></span>
+        </div>
+        <section class="transcript" aria-label="ข้อความถอดเสียง">
+          <h3>ข้อความถอดเสียง</h3>
+          <div class="entry"><span class="time">00:22</span><p><strong>คุณเอ</strong>วันนี้ขอเริ่มจากกำหนดส่งแบบร่างก่อนนะครับ</p></div>
+          <div class="entry"><span class="time">00:38</span><p><strong>คุณซี</strong>ฝั่งออกแบบจะส่งตัวอย่างหน้าหลักให้ดูวันพฤหัสค่ะ</p></div>
+          <div class="entry"><span class="time">01:05</span><p><strong>คุณบี</strong>งั้นผมจะรวมข้อเสนอแนะแล้วส่งแบบร่างวันศุกร์ครับ</p></div>
+          <div class="entry pending" hidden><span class="time">01:24</span><p><strong class="next-name"></strong>รอข้อความของผู้พูดช่วงใหม่</p></div>
+        </section>
+      </main>
+    </div>
+  </div>
+  <script>
+    (() => {
+      const root = document.getElementById('meeting-notes-preview');
+      const speakers = [...root.querySelectorAll('.speaker')];
+      const activeName = root.querySelector('.active-name');
+      const pending = root.querySelector('.pending');
+      const stop = root.querySelector('.stop');
+      function selectSpeaker(button) {
+        if (stop.disabled || button.getAttribute('aria-pressed') === 'true') return;
+        for (const speaker of speakers) speaker.setAttribute('aria-pressed', String(speaker === button));
+        activeName.textContent = button.dataset.name;
+        pending.querySelector('.next-name').textContent = button.dataset.name;
+        pending.hidden = false;
+      }
+      for (const speaker of speakers) speaker.addEventListener('click', () => selectSpeaker(speaker));
+      document.addEventListener('keydown', event => {
+        if (event.repeat || event.ctrlKey || event.altKey || event.metaKey || !/^[1-3]$/.test(event.key)) return;
+        selectSpeaker(speakers[Number(event.key) - 1]);
+      });
+      stop.addEventListener('click', () => {
+        root.querySelector('.status').textContent = 'จบการบันทึก';
+        root.querySelector('.dot').hidden = true;
+        root.querySelector('.now').hidden = true;
+        pending.hidden = true;
+        stop.disabled = true;
+        for (const speaker of speakers) {
+          speaker.disabled = true;
+          speaker.setAttribute('aria-pressed', 'false');
+        }
+      });
+    })();
+  </script>
+</div>
