@@ -89,7 +89,9 @@ mod tests {
         let mut timeline = SpeakerTimeline::default();
         timeline.record_change(4800, FIRST).unwrap();
         timeline.record_change(9600, SECOND).unwrap();
-        timeline.record_change(14400, Speaker::Unidentified).unwrap();
+        timeline
+            .record_change(14400, Speaker::Unidentified)
+            .unwrap();
 
         assert_eq!(timeline.speaker_at(4799), Speaker::Unidentified);
         assert_eq!(timeline.speaker_at(4800), FIRST);
