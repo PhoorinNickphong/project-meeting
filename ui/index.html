@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="meeting-key" content="__MEETING_KEY__">
+  <title>จดประชุม</title>
+  <link rel="stylesheet" href="/app.css">
+  <script type="module" src="/app.js"></script>
+</head>
+<body>
+  <header class="app-header">
+    <strong class="brand"><span aria-hidden="true">▤</span> จดประชุม</strong>
+    <nav aria-label="เมนูหลัก">
+      <button type="button" data-page="history">การประชุม</button>
+      <button type="button" data-page="settings">ตั้งค่า</button>
+    </nav>
+  </header>
+  <main>
+    <p id="error" role="alert" hidden></p>
+    <section id="history">
+      <div class="heading">
+        <div><h1>รายการประชุม</h1><p>บันทึกไว้บนเครื่องนี้</p></div>
+        <div class="line"><button type="button" data-page="history">รีเฟรช</button><button type="button" class="primary" data-page="setup">＋ ประชุมใหม่</button></div>
+      </div>
+      <ol id="meeting-list" class="panel meeting-list"></ol>
+    </section>
+    <section id="setup" hidden>
+      <div class="heading"><div><h1>ประชุมใหม่</h1><p>เลือกไมค์และตั้งชื่อผู้พูดก่อนเริ่ม</p></div></div>
+      <form id="setup-form">
+        <div class="columns">
+          <div class="panel fields">
+            <label>ชื่อการประชุม<input name="title" maxlength="100" required placeholder="ประชุมทีมประจำสัปดาห์"></label>
+            <label>ไมโครโฟน<select id="mic-select"><option value="">ไมค์เริ่มต้นของ Windows</option></select></label>
+            <button type="button" id="test-mic">ทดสอบไมค์</button>
+            <meter id="test-level" min="0" max="1" value="0" aria-label="ระดับเสียงไมค์"></meter>
+          </div>
+          <div class="panel fields">
+            <h2>ผู้พูดและปุ่มลัด</h2>
+            <label><kbd>1</kbd><input aria-label="ชื่อผู้พูด 1" name="speaker" maxlength="60" placeholder="ผู้พูด 1"></label>
+            <label><kbd>2</kbd><input aria-label="ชื่อผู้พูด 2" name="speaker" maxlength="60" placeholder="ผู้พูด 2"></label>
+            <label><kbd>3</kbd><input aria-label="ชื่อผู้พูด 3" name="speaker" maxlength="60" placeholder="ผู้พูด 3"></label>
+            <label><kbd>4</kbd><input aria-label="ชื่อผู้พูด 4" name="speaker" maxlength="60" placeholder="ผู้พูด 4"></label>
+            <label><kbd>5</kbd><input aria-label="ชื่อผู้พูด 5" name="speaker" maxlength="60" placeholder="ผู้พูด 5"></label>
+          </div>
+        </div>
+        <div class="actions"><button type="button" data-page="history">ย้อนกลับ</button><button type="submit" class="primary" id="start">เริ่มบันทึก</button></div>
+      </form>
+    </section>
+    <section id="record" aria-labelledby="record-title" hidden>
+      <div class="record-toolbar">
+        <div class="line"><strong class="recording">กำลังบันทึก</strong><time id="clock">00:00:00</time><meter id="record-level" min="0" max="1" value="0" aria-label="ระดับเสียงไมค์"></meter></div>
+        <div class="line">
+          <button type="button" id="mark" aria-keyshortcuts="M">ปักช่วงสำคัญ <kbd>M</kbd></button>
+          <button type="button" id="stop" class="stop">■ หยุดบันทึก</button>
+        </div>
+      </div>
+      <div class="record-layout">
+        <div class="session">
+          <h1 id="record-title"></h1>
+          <div class="markers"><h2>ช่วงที่ปัก</h2><ol id="live-markers" class="chips"></ol></div>
+          <h2>การเปลี่ยนผู้พูด</h2>
+          <ol id="event-list" class="events"></ol>
+          <p id="record-info" role="status"></p>
+        </div>
+        <aside class="speaker-panel">
+          <div class="current"><span>ผู้พูดตอนนี้</span><strong id="current-speaker" role="status">ไม่ทราบผู้พูด</strong></div>
+          <h2>สลับผู้พูด <span>1–5</span></h2>
+          <div id="speaker-buttons" class="keypad"></div>
+          <button type="button" id="unknown" aria-pressed="true">ไม่ทราบผู้พูด</button>
+        </aside>
+      </div>
+    </section>
+    <section id="review" hidden>
+      <div class="heading">
+        <div><p>ฟังย้อนหลัง</p><h1 id="review-title"></h1></div>
+        <a id="download-wav" class="button">บันทึก WAV</a>
+      </div>
+      <div class="panel">
+        <audio id="player" controls preload="metadata"></audio>
+        <div class="markers"><h2>ช่วงที่ปัก</h2><ol id="review-markers" class="chips"></ol></div>
+        <h2>จุดเปลี่ยนผู้พูด</h2><ol id="review-events" class="events"></ol>
+      </div>
+      <div class="actions"><button type="button" data-page="history">กลับรายการประชุม</button><button type="button" id="export-json">ส่งออกจุดเวลา JSON</button></div>
+    </section>
+    <section id="settings" hidden>
+      <div class="heading"><div><h1>ตั้งค่าแอป</h1><p>เสียงและข้อมูลอยู่บนเครื่องนี้</p></div></div>
+      <div class="panel"><h2>โฟลเดอร์การประชุม</h2><p id="storage-dir" class="path"></p></div>
+      <div class="actions"><button type="button" id="quit">ออกจากแอป</button></div>
+    </section>
+    <section id="recovery" hidden>
+      <div class="heading"><div><p>การบันทึกหยุดก่อนจบ</p><h1 id="recovery-title"></h1></div></div>
+      <div class="panel"><p id="available-audio"></p></div>
+      <div class="actions"><button type="button" data-page="history">ย้อนกลับ</button><button type="button" class="primary" id="recover">กู้และเปิดฟัง</button></div>
+    </section>
+  </main>
+</body>
+</html>
