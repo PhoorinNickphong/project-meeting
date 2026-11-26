@@ -308,9 +308,13 @@
     A03: { status: "done", note: "มีไฟล์แผนงานฉบับนี้" },
     A04: { status: "done", note: "เปิด repo สาธารณะ เชื่อม origin/main และเผยแพร่ซอร์สเริ่มต้นพร้อม MIT แล้ว", link: "https://github.com/PhoorinNickphong/project-meeting/issues/4" },
     A05: { status: "done", note: "เปิด Milestone เฟส 1 และนำ Issues ทั้ง 32 รายการเข้า GitHub Projects แล้ว", link: "https://github.com/users/PhoorinNickphong/projects/1" },
-    A06: { status: "todo", note: "มีภาพตัวเลือกหน้าจอ 5 แบบแล้ว รอเลือกก่อนเริ่มพัฒนาหน้าจอ", link: "https://github.com/PhoorinNickphong/project-meeting/issues/6" },
+    A06: { status: "review", note: "เลือกคอนโซลสีอำพันและใช้งานบน Windows ผ่านหน้าต่าง Edge แล้ว ตรวจการแสดงชื่อภาษาไทยและปุ่มลัดจากการทดสอบอัตโนมัติแล้ว เหลือลองพิมพ์ไทยและใช้ไมค์จริง", link: "https://github.com/PhoorinNickphong/project-meeting/issues/6" },
     A07: { status: "active", note: "ผ่าน format, lint, 2 tests และ build บน Windows ในเครื่องแล้ว GitHub Actions ยังติดปัญหาการเรียกเก็บเงินก่อนเริ่มทดสอบ", link: "https://github.com/PhoorinNickphong/project-meeting/issues/7" },
-    B04: { status: "active", note: "เริ่มแกนบันทึกเวลาเปลี่ยนผู้พูดแล้ว การเชื่อมไมค์และปุ่มลัดเป็นงานที่เหลือ", link: "https://github.com/PhoorinNickphong/project-meeting/issues/11" }
+    B01: { status: "active", note: "เลือกไมค์และดูระดับเสียงได้แล้ว ทดสอบผ่านใน Edge ด้วยไมค์จำลอง เหลือตรวจไมค์จริงและกรณีสิทธิ์ถูกปฏิเสธ", link: "https://github.com/PhoorinNickphong/project-meeting/issues/8" },
+    B02: { status: "active", note: "บันทึก WAV จากไมค์จำลองและตรวจไฟล์เสียงสังเคราะห์ 60 นาทีผ่าน เหลืออัดต่อเนื่องจากไมค์จริง", link: "https://github.com/PhoorinNickphong/project-meeting/issues/9" },
+    B04: { status: "active", note: "สลับผู้พูด 1–5 และปักเวลาสำคัญด้วย M ได้แล้ว ตรวจพบข้อมูลตำแหน่งเสียงในไฟล์หลังบันทึก", link: "https://github.com/PhoorinNickphong/project-meeting/issues/11" },
+    B06: { status: "active", note: "ทดสอบกู้ไฟล์หลังปิดโปรแกรมกลางทางแล้ว เหลือจำลองดิสก์เต็มและลองถอดไมค์จริง", link: "https://github.com/PhoorinNickphong/project-meeting/issues/13" },
+    B07: { status: "active", note: "ทดสอบคลิกเวลาที่ปักใน Edge และตรวจตำแหน่งต้น กลาง และท้ายไฟล์สังเคราะห์ 60 นาทีแล้ว เหลือตรวจผลกับการประชุมจริง", link: "https://github.com/PhoorinNickphong/project-meeting/issues/14" }
   };
   const fallback = { status: "todo", owner: "", link: "", note: "", updated: "" };
   let state = load();
