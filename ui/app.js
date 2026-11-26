@@ -37,12 +37,16 @@ async function api(path, { method = "GET", body, headers = {} } = {}) {
   return response.json();
 }
 
-function post(path, data) {
+function post(path, data, headers = {}) {
   return api(path, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...headers },
     body: data === undefined ? undefined : JSON.stringify(data),
   });
+}
+
+function recordingPost(session, action, data) {
+  return post(`/api/${session.meeting.id}/${action}`, data, { "X-Recording-Key": session.recordingKey });
 }
 
 function error(message = "") {
@@ -91,6 +95,7 @@ async function show(page) {
 async function historyList() {
   const list = $("meeting-list");
   const meetings = await api("/api/meetings");
+  const busy = meetings.some(meeting => meeting.recording);
   list.replaceChildren();
   if (!meetings.length) list.append(el("li", "ยังไม่มีการประชุม เลือก “ประชุมใหม่” เพื่อเริ่มบันทึก"));
   for (const meeting of meetings) {
@@ -102,9 +107,13 @@ async function historyList() {
         + " · " + time(meeting.frames, meeting.sample_rate)
         + " · ผู้พูด " + meeting.speakers.length + " คน"),
     );
-    const action = meeting.finished
-      ? button("เปิดฟัง", () => void review(meeting).catch(report))
-      : button("ตรวจไฟล์ที่ค้าง", () => void recoverPage(meeting).catch(report));
+    const action = meeting.recording
+      ? el("small", "กำลังอัดในอีกหน้าต่าง")
+      : meeting.finished
+        ? button("เปิดฟัง", () => void review(meeting).catch(report))
+        : busy
+          ? el("small", "กู้ได้หลังหยุดการอัด")
+          : button("ตรวจไฟล์ที่ค้าง", () => void recoverPage(meeting).catch(report));
     item.append(summary, action);
     list.append(item);
   }
@@ -203,16 +212,21 @@ async function start(event) {
     const source = context.createMediaStreamSource(stream);
     const mute = context.createGain();
     mute.gain.value = 0;
-    const meeting = await post("/api/start", { title, speakers, sample_rate: context.sampleRate });
+    const { meeting, recording_key: recordingKey } = await post("/api/start", {
+      title, speakers, sample_rate: context.sampleRate,
+    });
     if (currentPage !== "setup") {
-      await post(`/api/${meeting.id}/finish`);
+      await recordingPost({ meeting, recordingKey }, "abandon");
       return;
     }
     const session = {
-      meeting, stream, context, node, parts: [], pendingBytes: 0, bufferedBytes: 0, frames: 0, sent: 0,
+      meeting, recordingKey, stream, context, node, parts: [], pendingBytes: 0, bufferedBytes: 0, frames: 0, sent: 0,
       chain: Promise.resolve(), speaker: null, changes: [], markers: [], stopping: false, failed: false,
     };
     recording = session;
+    session.heartbeat = setInterval(() => {
+      if (!session.stopping && !session.failed) void recordingPost(session, "heartbeat").catch(() => {});
+    }, 5000);
     node.port.onmessage = ({data}) => receive(session, data);
     node.addEventListener("processorerror", () => void interrupt(session, "ไมค์หยุดส่งเสียง"));
     stream.getAudioTracks().forEach(track => track.addEventListener("ended", () => void stop("ไมค์หลุดระหว่างอัด")));
@@ -286,7 +300,11 @@ function flush(session) {
   queue(session, async () => {
     const upload = () => api(`/api/${session.meeting.id}/audio`, {
       method: "POST",
-      headers: { "Content-Type": "application/octet-stream", "X-Frame-Offset": String(offset) },
+      headers: {
+        "Content-Type": "application/octet-stream",
+        "X-Frame-Offset": String(offset),
+        "X-Recording-Key": session.recordingKey,
+      },
       body: pcm,
     });
     await upload().catch(upload);
@@ -313,7 +331,7 @@ function changeSpeaker(id) {
   updateSpeaker(session);
   renderTimes(session, false);
   flush(session);
-  queue(session, () => post(`/api/${session.meeting.id}/speaker`, event));
+  queue(session, () => recordingPost(session, "speaker", event));
 }
 
 function mark() {
@@ -324,10 +342,11 @@ function mark() {
   $("record-info").textContent = "ปักช่วง " + time(frame, session.meeting.sample_rate) + " แล้ว";
   renderTimes(session, false);
   flush(session);
-  queue(session, () => post(`/api/${session.meeting.id}/mark`, frame));
+  queue(session, () => recordingPost(session, "mark", frame));
 }
 
 async function closeMic(session) {
+  clearInterval(session.heartbeat);
   session.stream.getTracks().forEach(track => track.stop());
   if (session.context.state !== "closed") await session.context.close().catch(() => {});
 }
@@ -338,6 +357,7 @@ async function interrupt(session, message) {
   await closeMic(session);
   if (recording !== session) return;
   recording = undefined;
+  await recordingPost(session, "abandon").catch(() => {});
   try {
     await show("history");
     error("การบันทึกหยุด: " + message + " · เลือกตรวจไฟล์ที่ค้างเพื่อกู้เสียง");
@@ -365,7 +385,7 @@ async function stop(notice) {
     flush(session);
     await session.chain;
     if (session.failed) return;
-    const meeting = await post(`/api/${session.meeting.id}/finish`);
+    const meeting = await recordingPost(session, "finish");
     recording = undefined;
     await review(meeting);
     if (notice || !stopped) error(notice || "เก็บเสียงที่ได้รับแล้ว แต่อาจขาดช่วงท้าย");
@@ -444,7 +464,7 @@ $("stop").addEventListener("click", () => void stop());
 $("recover").addEventListener("click", async () => {
   if (!pendingRecovery) return;
   $("recover").disabled = true;
-  try { await review(await post(`/api/${pendingRecovery.id}/finish`)); }
+  try { await review(await post(`/api/${pendingRecovery.id}/recover`)); }
   catch (cause) { report(cause); }
   finally { $("recover").disabled = false; }
 });

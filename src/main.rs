@@ -8,7 +8,7 @@ use std::{
     net::{SocketAddr, TcpListener, TcpStream},
     path::{Path, PathBuf},
     process::Command,
-    time::Duration,
+    time::{Duration, Instant},
 };
 use tiny_http::{Header, Method, Request, Response, Server, StatusCode};
 
@@ -16,6 +16,40 @@ const INDEX: &str = include_str!("../ui/index.html");
 const CSS: &str = include_str!("../ui/app.css");
 const JS: &str = include_str!("../ui/app.js");
 const WORKLET: &str = include_str!("../ui/capture.js");
+const RECORDING_TIMEOUT: Duration = Duration::from_secs(30);
+
+struct ActiveRecording {
+    id: String,
+    owner_key: String,
+    last_seen: Instant,
+}
+
+#[derive(Serialize)]
+struct MeetingStatus {
+    #[serde(flatten)]
+    meeting: storage::Meeting,
+    recording: bool,
+}
+
+fn recording_conflict(message: &'static str) -> io::Error {
+    io::Error::new(io::ErrorKind::WouldBlock, message)
+}
+
+fn recording_access(
+    active: &mut Option<ActiveRecording>,
+    request: &Request,
+    id: &str,
+) -> io::Result<()> {
+    let recording = active
+        .as_mut()
+        .filter(|recording| recording.id == id)
+        .ok_or_else(|| recording_conflict("การอัดหยุดแล้ว เปิดรายการประชุมเพื่อกู้เสียง"))?;
+    if request_header(request, "X-Recording-Key") != Some(recording.owner_key.as_str()) {
+        return Err(recording_conflict("การอัดนี้อยู่ในอีกหน้าต่างหนึ่ง"));
+    }
+    recording.last_seen = Instant::now();
+    Ok(())
+}
 
 fn header(key: &str, value: &str) -> Header {
     Header::from_bytes(key, value).expect("internal response header is valid")
@@ -48,6 +82,10 @@ fn json(request: Request, result: io::Result<impl Serialize>) {
         Ok(body) => (200, body),
         Err(error) => match error.kind() {
             io::ErrorKind::NotFound => (404, r#"{"error":"ไม่พบการประชุม"}"#.into()),
+            io::ErrorKind::WouldBlock => (
+                409,
+                serde_json::json!({"error": error.to_string()}).to_string(),
+            ),
             io::ErrorKind::InvalidInput | io::ErrorKind::InvalidData => (
                 400,
                 serde_json::json!({"error": error.to_string()}).to_string(),
@@ -138,7 +176,13 @@ fn send_audio(request: Request, root: &Path, id: &str) {
     respond(request, response, "audio/wav");
 }
 
-fn handle(mut request: Request, root: &Path, host: &str, key: &str) -> bool {
+fn handle(
+    mut request: Request,
+    root: &Path,
+    host: &str,
+    key: &str,
+    active: &mut Option<ActiveRecording>,
+) -> bool {
     let url = request.url().to_owned();
     let (path, query) = url.split_once('?').unwrap_or((&url, ""));
     let method = request.method().clone();
@@ -169,14 +213,51 @@ fn handle(mut request: Request, root: &Path, host: &str, key: &str) -> bool {
         let _ = request.respond(Response::empty(StatusCode(403)));
         return true;
     }
+    if active
+        .as_ref()
+        .is_some_and(|recording| recording.last_seen.elapsed() >= RECORDING_TIMEOUT)
+    {
+        *active = None;
+    }
     match (&method, path) {
-        (&Method::Get, "/api/meetings") => json(request, storage::list(root)),
+        (&Method::Get, "/api/meetings") => json(
+            request,
+            storage::list(root).map(|meetings| {
+                meetings
+                    .into_iter()
+                    .map(|meeting| MeetingStatus {
+                        recording: active.as_ref().is_some_and(|entry| entry.id == meeting.id),
+                        meeting,
+                    })
+                    .collect::<Vec<_>>()
+            }),
+        ),
         (&Method::Get, "/api/config") => json(request, Ok(serde_json::json!({"directory": root}))),
         (&Method::Post, "/api/start") => {
-            let result = read_json(&mut request).and_then(|setup| storage::start(root, setup));
+            let result = (|| {
+                if active.is_some() {
+                    return Err(recording_conflict("มีการประชุมที่กำลังอัดอยู่"));
+                }
+                let owner_key = storage::random_id()?;
+                let meeting = storage::start(root, read_json(&mut request)?)?;
+                let response = serde_json::json!({"meeting": meeting, "recording_key": owner_key});
+                *active = Some(ActiveRecording {
+                    id: meeting.id,
+                    owner_key,
+                    last_seen: Instant::now(),
+                });
+                Ok(response)
+            })();
             json(request, result);
         }
         (&Method::Post, "/api/quit") => {
+            if active.is_some() {
+                json(
+                    request,
+                    Err::<(), _>(recording_conflict("หยุดบันทึกในหน้าต่างที่กำลังอัดก่อนออกจากแอป")),
+                );
+                return true;
+            }
             json(request, Ok(()));
             return false;
         }
@@ -192,25 +273,53 @@ fn handle(mut request: Request, root: &Path, host: &str, key: &str) -> bool {
                     std::thread::spawn(move || send_audio(request, &root, &id));
                 }
                 (Method::Post, Some((id, "audio"))) => {
-                    let result = request_header(&request, "X-Frame-Offset")
-                        .and_then(|value| value.parse().ok())
-                        .ok_or(io::ErrorKind::InvalidInput.into())
-                        .and_then(|offset| {
-                            storage::append(root, id, offset, &read_bytes(&mut request, 524_288)?)
-                        });
+                    let result = recording_access(active, &request, id).and_then(|()| {
+                        request_header(&request, "X-Frame-Offset")
+                            .and_then(|value| value.parse().ok())
+                            .ok_or(io::ErrorKind::InvalidInput.into())
+                            .and_then(|offset| {
+                                storage::append(
+                                    root,
+                                    id,
+                                    offset,
+                                    &read_bytes(&mut request, 524_288)?,
+                                )
+                            })
+                    });
                     json(request, result);
                 }
                 (Method::Post, Some((id, "speaker"))) => {
-                    let result =
-                        read_json(&mut request).and_then(|input| storage::change(root, id, input));
+                    let result = recording_access(active, &request, id)
+                        .and_then(|()| storage::change(root, id, read_json(&mut request)?));
                     json(request, result);
                 }
                 (Method::Post, Some((id, "mark"))) => {
-                    let result =
-                        read_json(&mut request).and_then(|frame| storage::mark(root, id, frame));
+                    let result = recording_access(active, &request, id)
+                        .and_then(|()| storage::mark(root, id, read_json(&mut request)?));
                     json(request, result);
                 }
-                (Method::Post, Some((id, "finish"))) => json(request, storage::finish(root, id)),
+                (Method::Post, Some((id, "heartbeat"))) => {
+                    let result = recording_access(active, &request, id);
+                    json(request, result);
+                }
+                (Method::Post, Some((id, "abandon"))) => {
+                    let result = recording_access(active, &request, id).map(|()| *active = None);
+                    json(request, result);
+                }
+                (Method::Post, Some((id, "finish"))) => {
+                    let result = recording_access(active, &request, id)
+                        .and_then(|()| storage::finish(root, id))
+                        .inspect(|_| *active = None);
+                    json(request, result);
+                }
+                (Method::Post, Some((id, "recover"))) => {
+                    let result = if active.is_some() {
+                        Err(recording_conflict("หยุดบันทึกในหน้าต่างที่กำลังอัดก่อนกู้ไฟล์"))
+                    } else {
+                        storage::finish(root, id)
+                    };
+                    json(request, result);
+                }
                 _ => json(request, Err::<(), _>(io::ErrorKind::NotFound.into())),
             }
         }
@@ -271,8 +380,9 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     if open_window && let Err(error) = launch_edge(&url) {
         eprintln!("Open the address above in a browser: {error}");
     }
+    let mut active = None;
     for request in server.incoming_requests() {
-        if !handle(request, &root, &host, &key) {
+        if !handle(request, &root, &host, &key, &mut active) {
             break;
         }
     }
