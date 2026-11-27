@@ -2,6 +2,12 @@ const $ = id => document.getElementById(id);
 const key = document.querySelector('meta[name="meeting-key"]').content;
 const sections = [...document.querySelectorAll("main section")];
 const unknown = "ไม่ทราบผู้พูด";
+const incidentNames = {
+  mic_disconnected: "ไมค์หลุดระหว่างอัด",
+  storage_full: "พื้นที่จัดเก็บเต็ม",
+  write_too_slow: "บันทึกลงดิสก์ตามเสียงไม่ทัน",
+  recording_error: "บันทึกเสียงขัดข้อง",
+};
 const dateFormat = new Intl.DateTimeFormat("th-TH", { dateStyle: "medium", timeStyle: "short" });
 let currentPage = "history";
 let recording;
@@ -9,6 +15,8 @@ let playback;
 let pendingRecovery;
 let micTest;
 let starting = false;
+let transcriptView;
+let transcriptTimer;
 
 function el(tag, text) {
   const element = document.createElement(tag);
@@ -32,7 +40,10 @@ async function api(path, { method = "GET", body, headers = {} } = {}) {
   });
   if (!response.ok) {
     const result = await response.json().catch(() => ({}));
-    throw new Error(result.error || "ติดต่อแอปในเครื่องไม่ได้");
+    const cause = new Error(result.error || "ติดต่อแอปในเครื่องไม่ได้");
+    cause.status = response.status;
+    cause.code = result.code;
+    throw cause;
   }
   return response.json();
 }
@@ -80,6 +91,8 @@ async function show(page) {
   error();
   if (page !== "setup") stopMicTest();
   if (page !== "review") {
+    clearTimeout(transcriptTimer);
+    transcriptView = undefined;
     $("player").pause();
     $("player").removeAttribute("src");
     $("player").load();
@@ -89,7 +102,12 @@ async function show(page) {
   for (const control of document.querySelectorAll(".app-header button")) control.disabled = page === "record";
   if (page === "history") await historyList();
   if (page === "setup") await listMicrophones();
-  if (page === "settings") $("storage-dir").textContent = (await api("/api/config")).directory;
+  if (page === "settings") {
+    const [files, model] = await Promise.all([api("/api/config"), api("/api/asr-config")]);
+    if (currentPage !== "settings") return;
+    $("storage-dir").textContent = files.directory;
+    renderModelSettings(model);
+  }
 }
 
 async function historyList() {
@@ -229,7 +247,7 @@ async function start(event) {
     }, 5000);
     node.port.onmessage = ({data}) => receive(session, data);
     node.addEventListener("processorerror", () => void interrupt(session, "ไมค์หยุดส่งเสียง"));
-    stream.getAudioTracks().forEach(track => track.addEventListener("ended", () => void stop("ไมค์หลุดระหว่างอัด")));
+    stream.getAudioTracks().forEach(track => track.addEventListener("ended", () => void stop("mic_disconnected")));
     source.connect(node).connect(mute).connect(context.destination);
     $("record-title").textContent = meeting.title;
     $("clock").textContent = "00:00:00";
@@ -274,7 +292,7 @@ function receive(session, data) {
   session.bufferedBytes += bytes.length;
   session.frames += bytes.length / 2;
   if (session.bufferedBytes > session.meeting.sample_rate * 2 * 12) {
-    void interrupt(session, "บันทึกลงดิสก์ตามเสียงไม่ทัน");
+    void interrupt(session, incidentNames.write_too_slow, "write_too_slow");
     return;
   }
   $("clock").textContent = time(session.frames, session.meeting.sample_rate);
@@ -285,7 +303,12 @@ function receive(session, data) {
 function queue(session, operation) {
   session.chain = session.chain.then(() => {
     if (!session.failed) return operation();
-  }).catch(cause => interrupt(session, cause.message));
+  }).catch(cause => {
+    if (cause.name === "TimeoutError") {
+      return interrupt(session, incidentNames.write_too_slow, "write_too_slow");
+    }
+    return interrupt(session, cause.message, cause.code === "storage_full" ? cause.code : "recording_error");
+  });
 }
 
 function flush(session) {
@@ -307,7 +330,13 @@ function flush(session) {
       },
       body: pcm,
     });
-    await upload().catch(upload);
+    try {
+      await upload();
+    } catch (cause) {
+      // Retry an uncertain delivery. An explicit server error applies to the chunk as sent.
+      if (cause.status !== undefined || session.failed) throw cause;
+      await upload();
+    }
     session.bufferedBytes -= pcm.length;
   });
 }
@@ -351,13 +380,13 @@ async function closeMic(session) {
   if (session.context.state !== "closed") await session.context.close().catch(() => {});
 }
 
-async function interrupt(session, message) {
+async function interrupt(session, message, reason = "recording_error") {
   if (session.failed) return;
   session.failed = true;
   await closeMic(session);
   if (recording !== session) return;
   recording = undefined;
-  await recordingPost(session, "abandon").catch(() => {});
+  await recordingPost(session, "abandon", reason).catch(() => {});
   try {
     await show("history");
     error("การบันทึกหยุด: " + message + " · เลือกตรวจไฟล์ที่ค้างเพื่อกู้เสียง");
@@ -366,7 +395,7 @@ async function interrupt(session, message) {
   }
 }
 
-async function stop(notice) {
+async function stop(reason) {
   const session = recording;
   if (!session || session.stopping) return;
   session.stopping = true;
@@ -385,12 +414,14 @@ async function stop(notice) {
     flush(session);
     await session.chain;
     if (session.failed) return;
+    const incident = reason || (!stopped ? "recording_error" : undefined);
+    if (incident) await recordingPost(session, "incident", incident);
     const meeting = await recordingPost(session, "finish");
     recording = undefined;
     await review(meeting);
-    if (notice || !stopped) error(notice || "เก็บเสียงที่ได้รับแล้ว แต่อาจขาดช่วงท้าย");
+    if (!stopped) error("เก็บเสียงที่ได้รับแล้ว แต่อาจขาดช่วงท้าย");
   } catch (cause) {
-    if (recording === session) await interrupt(session, cause.message);
+    if (recording === session) await interrupt(session, cause.message, cause.code === "storage_full" ? cause.code : reason);
     else report(cause);
   } finally {
     clearTimeout(timeout);
@@ -427,11 +458,77 @@ async function review(meeting) {
   playback = meeting;
   await show("review");
   $("review-title").textContent = meeting.title;
+  $("review-incident").textContent = incidentText(meeting);
+  $("review-incident").hidden = !meeting.incident;
   const src = `/api/${meeting.id}/audio?key=${key}`;
   $("player").src = src;
   $("download-wav").href = src;
   $("download-wav").download = "meeting-" + meeting.id + ".wav";
   renderTimes({ meeting, changes: meeting.changes, markers: meeting.markers }, true);
+  clearTimeout(transcriptTimer);
+  transcriptView = { meeting, path: `/api/${meeting.id}/transcript` };
+  $("transcribe").disabled = true;
+  $("transcribe").textContent = "ถอดเสียงภาษาไทย";
+  $("transcript-progress").hidden = true;
+  $("transcript-status").textContent = "กำลังเปิดผลถอดเสียง…";
+  $("transcript-lines").replaceChildren();
+  void refreshTranscript(transcriptView);
+}
+
+async function refreshTranscript(view, start = false) {
+  try {
+    const result = start ? await post(view.path) : await api(view.path);
+    if (view !== transcriptView) return;
+    const { meeting } = view;
+    const running = result.state === "running";
+    const complete = result.state === "complete";
+    const progress = $("transcript-progress");
+    const status = $("transcript-status");
+    const control = $("transcribe");
+    control.disabled = running || !meeting.frames;
+    control.textContent = complete || result.state === "failed" ? "ถอดเสียงอีกครั้ง" : "ถอดเสียงภาษาไทย";
+    progress.hidden = !running;
+    if (running) {
+      const percent = Math.min(99, Math.floor(100 * result.processed_frames / meeting.frames));
+      progress.value = percent;
+      const message = result.processed_frames ? `กำลังถอดเสียงบนเครื่อง ${percent}%` : "กำลังเตรียมโมเดลและถอดเสียงบนเครื่อง…";
+      if (status.textContent !== message) status.textContent = message;
+      transcriptTimer = setTimeout(() => void refreshTranscript(view), 700);
+      return;
+    }
+    if (complete) {
+      const list = $("transcript-lines");
+      list.replaceChildren();
+      const { segments, sample_rate: rate } = result.transcript;
+      status.textContent = segments.length ? `ถอดเสียงเสร็จแล้ว · ${segments.length} ช่วง` : "ถอดเสียงเสร็จแล้ว · ไม่พบข้อความใน WAV";
+      for (const segment of segments) {
+        const startTime = segment.start_frame / rate;
+        const tenth = Math.floor(10 * (segment.start_frame % rate) / rate);
+        const stamp = `${time(segment.start_frame, rate)}.${tenth}`;
+        const item = el("li", "");
+        const line = el("div", "");
+        const seek = button(stamp, () => { $("player").currentTime = startTime; });
+        seek.setAttribute("aria-label", `เลื่อนไปเวลา ${stamp}`);
+        line.append(seek, el("strong", speakerName(meeting, segment.speaker)));
+        item.append(line, el("p", segment.text));
+        list.append(item);
+      }
+    } else if (result.state === "failed") {
+      status.textContent = result.message;
+    } else {
+      status.textContent = meeting.frames ? "ใช้ OpenThai FP32 เพื่อถอดไฟล์ WAV ที่บันทึกไว้" : "การประชุมนี้ไม่มีเสียงให้ถอด";
+    }
+  } catch (cause) {
+    if (view !== transcriptView) return;
+    $("transcript-status").textContent = cause.message;
+    $("transcript-progress").hidden = true;
+    $("transcribe").disabled = !view.meeting.frames;
+  }
+}
+
+function renderModelSettings(model) {
+  $("model-folder").value = model.folder.startsWith("\\\\?\\") ? model.folder.slice(4) : model.folder;
+  $("model-status").textContent = model.message;
 }
 
 async function recoverPage(meeting) {
@@ -440,6 +537,15 @@ async function recoverPage(meeting) {
   $("recovery-title").textContent = meeting.title;
   $("available-audio").textContent = "พบเสียงบนดิสก์ " + time(meeting.frames, meeting.sample_rate)
     + " · ช่วงท้ายอาจบันทึกไม่ครบ";
+  $("recovery-incident").textContent = incidentText(meeting);
+  $("recovery-incident").hidden = !meeting.incident;
+}
+
+function incidentText(meeting) {
+  if (!meeting.incident) return "";
+  const { reason, frame } = meeting.incident;
+  return "การบันทึกหยุด: " + (incidentNames[reason] || incidentNames.recording_error)
+    + " · เสียงที่เก็บได้ถึง " + time(frame, meeting.sample_rate);
 }
 
 function downloadJson() {
@@ -469,6 +575,19 @@ $("recover").addEventListener("click", async () => {
   finally { $("recover").disabled = false; }
 });
 $("export-json").addEventListener("click", downloadJson);
+$("transcribe").addEventListener("click", () => {
+  if (!transcriptView) return;
+  $("transcribe").disabled = true;
+  void refreshTranscript(transcriptView, true);
+});
+$("asr-settings").addEventListener("submit", async event => {
+  event.preventDefault();
+  const control = event.submitter;
+  if (control) control.disabled = true;
+  try { renderModelSettings(await post("/api/asr-config", $("model-folder").value.trim())); }
+  catch (cause) { $("model-status").textContent = cause.message; }
+  finally { if (control) control.disabled = false; }
+});
 $("quit").addEventListener("click", async () => {
   try {
     await post("/api/quit");

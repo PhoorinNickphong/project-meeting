@@ -77,7 +77,19 @@
         <a id="download-wav" class="button">บันทึก WAV</a>
       </div>
       <div class="panel">
+        <p id="review-incident" class="incident" hidden></p>
         <audio id="player" controls preload="metadata"></audio>
+      </div>
+      <div class="panel transcript-panel">
+        <div class="line transcript-header">
+          <h2>ข้อความจากการประชุม</h2>
+          <button type="button" class="primary" id="transcribe" disabled>ถอดเสียงภาษาไทย</button>
+        </div>
+        <p id="transcript-status" role="status"></p>
+        <progress id="transcript-progress" max="100" value="0" aria-label="ความคืบหน้าการถอดเสียง" hidden></progress>
+        <ol id="transcript-lines" class="transcript-lines"></ol>
+      </div>
+      <div class="panel review-timeline">
         <div class="markers"><h2>ช่วงที่ปัก</h2><ol id="review-markers" class="chips"></ol></div>
         <h2>จุดเปลี่ยนผู้พูด</h2><ol id="review-events" class="events"></ol>
       </div>
@@ -86,11 +98,18 @@
     <section id="settings" hidden>
       <div class="heading"><div><h1>ตั้งค่าแอป</h1><p>เสียงและข้อมูลอยู่บนเครื่องนี้</p></div></div>
       <div class="panel"><h2>โฟลเดอร์การประชุม</h2><p id="storage-dir" class="path"></p></div>
+      <form id="asr-settings" class="panel fields transcript-panel">
+        <h2>ถอดเสียงออฟไลน์</h2>
+        <label for="model-folder">โฟลเดอร์ OpenThai ONNX FP32</label>
+        <div class="line model-path"><input id="model-folder" type="text" spellcheck="false" autocomplete="off" required>
+          <button type="submit">บันทึกพาธ</button></div>
+        <p id="model-status" role="status"></p>
+      </form>
       <div class="actions"><button type="button" id="quit">ออกจากแอป</button></div>
     </section>
     <section id="recovery" hidden>
       <div class="heading"><div><p>การบันทึกหยุดก่อนจบ</p><h1 id="recovery-title"></h1></div></div>
-      <div class="panel"><p id="available-audio"></p></div>
+      <div class="panel"><p id="available-audio"></p><p id="recovery-incident" class="incident" hidden></p></div>
       <div class="actions"><button type="button" data-page="history">ย้อนกลับ</button><button type="button" class="primary" id="recover">กู้และเปิดฟัง</button></div>
     </section>
   </main>

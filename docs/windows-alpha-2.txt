@@ -1,0 +1,50 @@
+จดประชุม v0.1.0-alpha.2 สำหรับ Windows x64
+
+เริ่มใช้งาน
+1. เตรียม Microsoft Edge บน Windows x64 และพื้นที่ว่างประมาณ 6 GB ระหว่างเตรียมไฟล์โมเดล
+2. ดาวน์โหลด ZIP ตัวแอปจาก GitHub Releases แล้วเลือก Extract All หรือ แตกไฟล์ทั้งหมด ลงในไดรฟ์ในเครื่อง
+   https://github.com/PhoorinNickphong/project-meeting/releases
+3. ถ้าแอปรุ่นเดิมยังเปิดอยู่ ให้ไปที่ ตั้งค่า → ออกจากแอป ก่อนเปิดรุ่นนี้
+4. เปิด meeting-notes.exe จากโฟลเดอร์ที่แตกไฟล์ไว้ แอปจะเปิดหน้าต่าง Microsoft Edge
+   ใช้ส่วนอัดเสียงและฟังย้อนหลังได้ทันที ให้เตรียมโมเดลตามขั้นตอนด้านล่างเพื่อเปิดใช้การถอดเสียง
+
+เตรียมโมเดลถอดเสียงครั้งแรก
+1. ดาวน์โหลดไฟล์ทั้งสองจาก iApp ที่ลิงก์นี้
+   https://huggingface.co/iapp/OpenThai2.0-ASR-Streaming-ONNX/tree/9f142a43e4d35a422c1c7dac40772ef707387ebc
+   - openthai2.0-asr-streaming-fp32.asr.zip (149 MB)
+   - encoder.onnx.data (2.45 GB)
+2. สร้างโฟลเดอร์ models แล้วสร้าง OpenThai2.0-ASR-Streaming-ONNX ไว้ข้างใน
+   ให้ models อยู่ข้าง meeting-notes.exe และ onnxruntime.dll
+3. แตก ZIP โมเดล แล้วนำ encoder.onnx, decoder_joint.onnx และ tokens.txt ลงใน OpenThai2.0-ASR-Streaming-ONNX
+   วาง encoder.onnx.data ลงในโฟลเดอร์เดียวกัน และเก็บ LICENSE ของโมเดลจากหน้า iApp ไว้ด้วย
+4. เปิด ตั้งค่า → ถอดเสียงออฟไลน์ ควรขึ้นว่า ไฟล์ OpenThai FP32 และ ONNX Runtime ครบ
+   จากจุดนี้ถอดเสียงออฟไลน์ด้วย CPU ได้โดยไม่ต้องมี API Key
+
+ตำแหน่งหลังเตรียมไฟล์
+  meeting-notes.exe
+  onnxruntime.dll
+  models/OpenThai2.0-ASR-Streaming-ONNX/encoder.onnx
+  models/OpenThai2.0-ASR-Streaming-ONNX/encoder.onnx.data
+  models/OpenThai2.0-ASR-Streaming-ONNX/decoder_joint.onnx
+  models/OpenThai2.0-ASR-Streaming-ONNX/tokens.txt
+
+อัดเสียงและถอดข้อความ
+1. เลือก ประชุมใหม่ กรอกชื่อประชุมและชื่อผู้พูดได้สูงสุด 5 คน เลือกและทดสอบไมค์
+2. กด เริ่มบันทึก แล้วกด 1–5 หรือคลิกชื่อทุกครั้งที่ผู้พูดเปลี่ยน
+3. กด หยุดบันทึก แล้วกด ถอดเสียงภาษาไทย ในหน้าฟังย้อนหลัง
+4. คลิกเวลาหน้าข้อความเพื่อฟังเทียบกับเสียง ช่วงก่อนกดชื่อจะแสดงว่า ไม่ทราบผู้พูด
+   ชื่อผู้พูดอ้างอิงจากเวลาที่กดไว้ คำพูดซ้อนหรือกดชื่อช้าอาจทำให้ป้ายชื่อคลาดจากเสียงจริง
+5. เปิดผลเดิมซ้ำได้จากรายการประชุม WAV และ transcript.json อยู่ในโฟลเดอร์การประชุม
+   ดูพาธข้อมูลจริงได้ที่ ตั้งค่า → โฟลเดอร์การประชุม
+
+ถ้าติดขัด
+- หากหาโมเดลไม่เจอ ให้ตรวจว่าชื่อไฟล์ตรงตามรายการ และไฟล์โมเดลอยู่ใน OpenThai2.0-ASR-Streaming-ONNX โดยตรง
+- หากไฟล์ครบแต่ Windows แจ้งว่าโหลด ONNX Runtime ไม่ได้ ให้ตรวจ Microsoft Visual C++ Redistributable x64
+  ดาวน์โหลดจาก Microsoft ที่ https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist
+- การถอด FP32 ใช้ RAM หลาย GB และความเร็วขึ้นกับเครื่อง หากช้าให้ลองกับเสียงสั้นก่อน
+- เวลาแจ้งผล ให้ระบุรุ่น Windows ความยาวเสียง เวลาที่ใช้ถอด และตัวอย่างข้อความที่คลาดเคลื่อน
+
+โมเดล OpenThai2.0-ASR-Streaming-ONNX FP32 พัฒนาโดย iApp Technology เปิดตัวร่วมกับ AIEAT
+โดยใช้ NVIDIA Nemotron ASR เป็นฐาน ดู OpenMDW-1.1 ใน models/OpenThai2.0-ASR-Streaming-ONNX/LICENSE
+รายละเอียดโมเดล https://huggingface.co/iapp/OpenThai2.0-ASR-Streaming-ONNX
+สัญญาอนุญาตของแอปและ ONNX Runtime อยู่ใน LICENSE และโฟลเดอร์ licenses ตามลำดับ

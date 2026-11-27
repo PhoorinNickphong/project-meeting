@@ -69,8 +69,19 @@ kbd { display: inline-block; border: 1px solid currentColor; border-radius: 4px;
 .chips time, .chips button { color: var(--key); background: var(--tint); border: 1px solid #755832; border-radius: 6px; padding: 3px 7px; }
 .events li { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; border-top: 1px solid var(--line); padding: 7px 0; }
 .events time { color: var(--key); font-family: Consolas, monospace; }
+.transcript-panel, .review-timeline { margin-top: 14px; }
+.transcript-header { flex-wrap: wrap; justify-content: space-between; gap: 8px; }
+#transcript-status, #model-status { margin: 8px 0; color: var(--sub); overflow-wrap: anywhere; }
+#transcript-progress { width: 100%; accent-color: var(--key); }
+.transcript-lines { list-style: none; margin: 0; padding: 0; }
+.transcript-lines li { border-top: 1px solid var(--line); padding: 12px 0; }
+.transcript-lines li div { display: flex; flex-wrap: wrap; align-items: center; gap: 9px; }
+.transcript-lines li button { color: var(--key); font-family: Consolas, monospace; }
+.transcript-lines li p { margin: 6px 0 0; overflow-wrap: anywhere; }
+.model-path { gap: 8px; flex-wrap: wrap; }
 audio { width: 100%; }
 #error { color: #ffe0df; background: #492726; border: 1px solid #a65e58; padding: 9px 12px; margin-bottom: 12px; border-radius: 8px; }
+.incident { color: var(--key); margin-block: 4px 10px; }
 @media(max-width: 610px) {
   .columns, .record-layout { grid-template-columns: minmax(0,1fr); }
   .speaker-panel { grid-row: 1; border-left: 0; border-bottom: 1px solid var(--line); }

@@ -2,7 +2,7 @@ use meeting_notes_core::{Speaker, SpeakerTimeline};
 use serde::{Deserialize, Serialize};
 use std::{
     fs::{self, File, OpenOptions},
-    io::{self, Seek, SeekFrom, Write},
+    io::{self, Read, Seek, SeekFrom, Write},
     num::NonZeroU32,
     path::Path,
     time::{SystemTime, UNIX_EPOCH},
@@ -10,6 +10,40 @@ use std::{
 
 const WAV_HEADER_SIZE: u64 = 44;
 const MAX_PCM_BYTES: u64 = u32::MAX as u64 - 37;
+
+#[derive(Clone, Copy, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+#[repr(u8)]
+pub enum IncidentReason {
+    MicDisconnected = 1,
+    StorageFull = 2,
+    WriteTooSlow = 3,
+    RecordingError = 4,
+}
+
+#[derive(Deserialize, Serialize)]
+pub struct Incident {
+    pub reason: IncidentReason,
+    pub frame: u64,
+}
+
+impl Incident {
+    fn read(path: &Path) -> io::Result<Option<Self>> {
+        let mut record = [0; 9];
+        File::open(path)?.read_exact(&mut record)?;
+        let reason = match record[0] {
+            1 => IncidentReason::MicDisconnected,
+            2 => IncidentReason::StorageFull,
+            3 => IncidentReason::WriteTooSlow,
+            4 => IncidentReason::RecordingError,
+            _ => return Ok(None),
+        };
+        Ok(Some(Self {
+            reason,
+            frame: u64::from_le_bytes(record[1..].try_into().unwrap()),
+        }))
+    }
+}
 
 #[derive(Deserialize)]
 pub struct Setup {
@@ -35,6 +69,8 @@ pub struct Meeting {
     pub finished: bool,
     pub changes: Vec<Change>,
     pub markers: Vec<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub incident: Option<Incident>,
 }
 
 pub fn random_id() -> io::Result<String> {
@@ -59,7 +95,7 @@ fn invalid(message: &'static str) -> io::Error {
     io::Error::new(io::ErrorKind::InvalidInput, message)
 }
 
-fn load(root: &Path, id: &str) -> io::Result<Meeting> {
+pub(crate) fn load(root: &Path, id: &str) -> io::Result<Meeting> {
     if !valid_id(id) {
         return Err(io::ErrorKind::NotFound.into());
     }
@@ -69,7 +105,30 @@ fn load(root: &Path, id: &str) -> io::Result<Meeting> {
         .len()
         .saturating_sub(WAV_HEADER_SIZE))
         / 2;
+    if meeting.incident.is_none()
+        && let Ok(incident) = Incident::read(&dir.join("incident.dat"))
+    {
+        meeting.incident = incident;
+    }
     Ok(meeting)
+}
+
+pub fn record_incident(root: &Path, id: &str, reason: IncidentReason) -> io::Result<()> {
+    let meeting = load(root, id)?;
+    if meeting.finished || meeting.incident.is_some() {
+        return Ok(());
+    }
+    let mut file = OpenOptions::new()
+        .write(true)
+        .create(true)
+        .truncate(false)
+        .open(root.join(id).join("incident.dat"))?;
+    // Reserve this slot at start so a recording failure does not require a new file.
+    let mut record = [0; 9];
+    record[0] = reason as u8;
+    record[1..].copy_from_slice(&meeting.frames.to_le_bytes());
+    file.write_all(&record)?;
+    file.sync_all()
 }
 
 fn save(root: &Path, meeting: &Meeting) -> io::Result<()> {
@@ -126,9 +185,13 @@ pub fn start(root: &Path, setup: Setup) -> io::Result<Meeting> {
         finished: false,
         changes: Vec::new(),
         markers: Vec::new(),
+        incident: None,
     };
     let dir = root.join(&meeting.id);
     fs::create_dir(&dir)?;
+    let mut incident = File::create(dir.join("incident.dat"))?;
+    incident.write_all(&[0; 9])?;
+    incident.sync_all()?;
     let mut file = File::create(dir.join("audio.wav"))?;
     wav_header(&mut file, meeting.sample_rate, 0)?;
     save(root, &meeting)?;
@@ -162,25 +225,43 @@ pub fn append(root: &Path, id: &str, offset: u64, pcm: &[u8]) -> io::Result<u64>
         .ok_or_else(|| invalid("ไฟล์เสียงเต็มขนาด WAV"))?;
     if offset < meeting.frames && end_frame <= meeting.frames {
         // The client may retry after the server wrote the chunk but lost its response.
-        use std::io::Read;
         let mut recorded = vec![0; pcm.len()];
         file.seek(SeekFrom::Start(WAV_HEADER_SIZE + offset * 2))?;
         file.read_exact(&mut recorded)?;
         if recorded == pcm {
+            wav_header(&mut file, meeting.sample_rate, (meeting.frames * 2) as u32)?;
             return Ok(end_frame);
         }
     }
     if offset != meeting.frames {
         return Err(invalid("ตำแหน่งข้อมูลเสียงไม่ต่อเนื่อง"));
     }
-    let previous_length = WAV_HEADER_SIZE + offset * 2;
-    file.seek(SeekFrom::Start(previous_length))?;
-    if let Err(error) = file.write_all(pcm) {
-        let _ = file.set_len(previous_length);
-        return Err(error);
-    }
-    wav_header(&mut file, meeting.sample_rate, (end_frame * 2) as u32)?;
+    write_chunk(&mut file, meeting.sample_rate, offset, pcm, File::write_all)?;
     Ok(end_frame)
+}
+
+fn write_chunk(
+    file: &mut File,
+    sample_rate: u32,
+    offset: u64,
+    pcm: &[u8],
+    write_pcm: impl FnOnce(&mut File, &[u8]) -> io::Result<()>,
+) -> io::Result<()> {
+    let previous_bytes = offset * 2;
+    let previous_length = WAV_HEADER_SIZE + previous_bytes;
+    file.seek(SeekFrom::Start(previous_length))?;
+    let result = write_pcm(file, pcm).and_then(|()| {
+        wav_header(
+            file,
+            sample_rate,
+            (previous_bytes + pcm.len() as u64) as u32,
+        )
+    });
+    if result.is_err() {
+        let _ = file.set_len(previous_length);
+        let _ = wav_header(file, sample_rate, previous_bytes as u32);
+    }
+    result
 }
 
 fn speaker(value: Option<u32>) -> Speaker {
@@ -258,4 +339,45 @@ pub fn audio(root: &Path, id: &str) -> io::Result<File> {
         return Err(invalid("กรุณาจบหรือกู้การประชุมก่อนเปิดเสียง"));
     }
     File::open(root.join(id).join("audio.wav"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_partial_disk_full_write_preserves_audio_and_records_the_cutoff() {
+        let root = std::env::temp_dir().join(format!("meeting-storage-{}", random_id().unwrap()));
+        fs::create_dir(&root).unwrap();
+        let meeting = start(
+            &root,
+            Setup {
+                title: "Disk full".into(),
+                speakers: vec!["Speaker".into()],
+                sample_rate: 16000,
+            },
+        )
+        .unwrap();
+        append(&root, &meeting.id, 0, &[7; 3200]).unwrap();
+        let path = root.join(&meeting.id).join("audio.wav");
+        let original = fs::read(&path).unwrap();
+        let mut file = OpenOptions::new().write(true).open(&path).unwrap();
+        let error = write_chunk(&mut file, 16000, 1600, &[9; 3200], |file, pcm| {
+            file.write_all(&pcm[..137])?;
+            Err(io::ErrorKind::StorageFull.into())
+        })
+        .unwrap_err();
+        drop(file);
+        assert_eq!(error.kind(), io::ErrorKind::StorageFull);
+        assert_eq!(fs::read(&path).unwrap(), original);
+
+        record_incident(&root, &meeting.id, IncidentReason::StorageFull).unwrap();
+        let recovered = finish(&root, &meeting.id).unwrap();
+        assert_eq!(recovered.frames, 1600);
+        let incident = recovered.incident.unwrap();
+        assert!(matches!(incident.reason, IncidentReason::StorageFull));
+        assert_eq!(incident.frame, 1600);
+        assert_eq!(fs::read(path).unwrap(), original);
+        fs::remove_dir_all(root).unwrap();
+    }
 }

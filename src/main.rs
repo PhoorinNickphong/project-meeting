@@ -1,3 +1,4 @@
+mod asr;
 mod storage;
 
 use serde::{Serialize, de::DeserializeOwned};
@@ -85,6 +86,10 @@ fn json(request: Request, result: io::Result<impl Serialize>) {
             io::ErrorKind::WouldBlock => (
                 409,
                 serde_json::json!({"error": error.to_string()}).to_string(),
+            ),
+            io::ErrorKind::StorageFull => (
+                507,
+                r#"{"code":"storage_full","error":"พื้นที่จัดเก็บเต็ม ให้เพิ่มพื้นที่ก่อนกู้ไฟล์"}"#.into(),
             ),
             io::ErrorKind::InvalidInput | io::ErrorKind::InvalidData => (
                 400,
@@ -182,6 +187,7 @@ fn handle(
     host: &str,
     key: &str,
     active: &mut Option<ActiveRecording>,
+    asr: &asr::Asr,
 ) -> bool {
     let url = request.url().to_owned();
     let (path, query) = url.split_once('?').unwrap_or((&url, ""));
@@ -233,6 +239,12 @@ fn handle(
             }),
         ),
         (&Method::Get, "/api/config") => json(request, Ok(serde_json::json!({"directory": root}))),
+        (&Method::Get, "/api/asr-config") => json(request, Ok(asr::config(root))),
+        (&Method::Post, "/api/asr-config") => {
+            let result = read_json::<PathBuf>(&mut request)
+                .and_then(|folder| asr::set_folder(root, &folder));
+            json(request, result);
+        }
         (&Method::Post, "/api/start") => {
             let result = (|| {
                 if active.is_some() {
@@ -258,6 +270,13 @@ fn handle(
                 );
                 return true;
             }
+            if asr.busy() {
+                json(
+                    request,
+                    Err::<(), _>(recording_conflict("รอให้ถอดเสียงเสร็จก่อนออกจากแอป")),
+                );
+                return true;
+            }
             json(request, Ok(()));
             return false;
         }
@@ -267,6 +286,8 @@ fn handle(
                 .and_then(|tail| tail.split_once('/'))
                 .filter(|(id, _)| storage::valid_id(id));
             match (method, route) {
+                (Method::Get, Some((id, "transcript"))) => json(request, asr.status(root, id)),
+                (Method::Post, Some((id, "transcript"))) => json(request, asr.start(root, id)),
                 (Method::Get, Some((id, "audio"))) => {
                     let root = root.to_owned();
                     let id = id.to_owned();
@@ -286,6 +307,16 @@ fn handle(
                                 )
                             })
                     });
+                    if result
+                        .as_ref()
+                        .is_err_and(|error| error.kind() == io::ErrorKind::StorageFull)
+                    {
+                        let _ = storage::record_incident(
+                            root,
+                            id,
+                            storage::IncidentReason::StorageFull,
+                        );
+                    }
                     json(request, result);
                 }
                 (Method::Post, Some((id, "speaker"))) => {
@@ -302,8 +333,25 @@ fn handle(
                     let result = recording_access(active, &request, id);
                     json(request, result);
                 }
+                (Method::Post, Some((id, "incident"))) => {
+                    let result = recording_access(active, &request, id).and_then(|()| {
+                        storage::record_incident(root, id, read_json(&mut request)?)
+                    });
+                    json(request, result);
+                }
                 (Method::Post, Some((id, "abandon"))) => {
-                    let result = recording_access(active, &request, id).map(|()| *active = None);
+                    let result = recording_access(active, &request, id).and_then(|()| {
+                        let note = (|| {
+                            let bytes = read_bytes(&mut request, 256)?;
+                            if bytes.is_empty() {
+                                return Ok(());
+                            }
+                            let reason = serde_json::from_slice(&bytes)?;
+                            storage::record_incident(root, id, reason)
+                        })();
+                        *active = None;
+                        note
+                    });
                     json(request, result);
                 }
                 (Method::Post, Some((id, "finish"))) => {
@@ -381,8 +429,9 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         eprintln!("Open the address above in a browser: {error}");
     }
     let mut active = None;
+    let asr = asr::Asr::default();
     for request in server.incoming_requests() {
-        if !handle(request, &root, &host, &key, &mut active) {
+        if !handle(request, &root, &host, &key, &mut active, &asr) {
             break;
         }
     }
